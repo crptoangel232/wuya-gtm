@@ -8,14 +8,26 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getScoreBreakdown } from '@/lib/scoring';
 import { exportOpportunityToCsv, exportLeadsToCsv, downloadCsv } from '@/lib/csv-export';
 import { OPPORTUNITY_STATUS } from '@/lib/constants';
 import type { OpportunityStatus, UrgencyLabel, PriceDropSeverity } from '@/lib/constants';
-import { ArrowLeft, Download, Users, Loader2, ExternalLink, MapPin, Package, Clock, TrendingDown, Target } from 'lucide-react';
+import { ArrowLeft, Download, Users, Loader2, ExternalLink, MapPin, Package, Clock, TrendingDown, Target, Info, HelpCircle } from 'lucide-react';
 import { format } from 'date-fns';
+
+const PRODUCE_ICONS: Record<string, string> = {
+  tomato: '🍅',
+  onion: '🧅',
+  rice: '🌾',
+  cassava: '🥔',
+  pepper: '🌶️',
+  potato: '🥔',
+  okra: '🥒',
+};
 
 interface Signal {
   id: string;
@@ -141,8 +153,8 @@ export default function OpportunityDetail() {
       if (response.error) throw response.error;
 
       toast({
-        title: 'Leads enriched!',
-        description: `Added ${response.data.leadsAdded} new buyer leads`,
+        title: 'Buyers found!',
+        description: `Added ${response.data.leadsAdded} potential buyer contacts`,
       });
 
       // Refetch leads
@@ -157,7 +169,7 @@ export default function OpportunityDetail() {
       console.error('Error enriching leads:', error);
       toast({
         title: 'Enrichment failed',
-        description: 'Could not fetch buyer leads. Using fallback data.',
+        description: 'Could not fetch buyer contacts. Using fallback data.',
         variant: 'destructive',
       });
     } finally {
@@ -227,9 +239,13 @@ export default function OpportunityDetail() {
       <div className="min-h-screen bg-background">
         <Header />
         <div className="container mx-auto px-4 py-8 text-center">
-          <p className="text-lg text-muted-foreground">Opportunity not found</p>
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+            <Package className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <p className="text-lg text-foreground">Opportunity not found</p>
+          <p className="mt-1 text-muted-foreground">This opportunity may have been removed</p>
           <Button asChild className="mt-4">
-            <Link to="/dashboard">Back to Dashboard</Link>
+            <Link to="/opportunities">Back to Opportunities</Link>
           </Button>
         </div>
       </div>
@@ -251,9 +267,9 @@ export default function OpportunityDetail() {
       <main className="container mx-auto px-4 py-8">
         {/* Back button */}
         <Button variant="ghost" asChild className="mb-6">
-          <Link to="/dashboard" className="flex items-center gap-2">
+          <Link to="/opportunities" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
+            Back to Opportunities
           </Link>
         </Button>
 
@@ -265,12 +281,13 @@ export default function OpportunityDetail() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="flex items-center gap-3 text-2xl capitalize">
-                      {opportunity.signals.produce_type}
+                    <CardTitle className="flex items-center gap-3 text-2xl">
+                      <span>{PRODUCE_ICONS[opportunity.signals.produce_type] || '🥬'}</span>
+                      <span className="capitalize">{opportunity.signals.produce_type}</span>
                       <UrgencyBadge urgency={opportunity.urgency_label as UrgencyLabel} />
                     </CardTitle>
                     <CardDescription>
-                      Signal submitted on {format(new Date(opportunity.signals.created_at), 'MMMM d, yyyy')}
+                      Alert reported on {format(new Date(opportunity.signals.created_at), 'MMMM d, yyyy')}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -298,14 +315,14 @@ export default function OpportunityDetail() {
                   <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-4">
                     <MapPin className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <p className="text-sm text-muted-foreground">District</p>
+                      <p className="text-sm text-muted-foreground">Location</p>
                       <p className="font-medium">{opportunity.signals.district}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-4">
                     <Package className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Quantity</p>
+                      <p className="text-sm text-muted-foreground">Quantity Available</p>
                       <p className="font-medium">
                         {opportunity.signals.quantity} {opportunity.signals.unit}
                       </p>
@@ -314,9 +331,9 @@ export default function OpportunityDetail() {
                   <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-4">
                     <Clock className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Harvest Deadline</p>
+                      <p className="text-sm text-muted-foreground">Time Until Spoilage</p>
                       <p className="font-medium">
-                        {opportunity.signals.harvest_deadline_days} days until spoilage
+                        {opportunity.signals.harvest_deadline_days} days remaining
                       </p>
                     </div>
                   </div>
@@ -331,7 +348,7 @@ export default function OpportunityDetail() {
 
                 {opportunity.signals.notes && (
                   <div className="mt-4 rounded-lg border bg-card p-4">
-                    <p className="text-sm font-medium text-muted-foreground">Notes</p>
+                    <p className="text-sm font-medium text-muted-foreground">Additional Details</p>
                     <p className="mt-1">{opportunity.signals.notes}</p>
                   </div>
                 )}
@@ -343,7 +360,7 @@ export default function OpportunityDetail() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Target className="h-5 w-5 text-primary" />
-                  Recommended GTM Action
+                  Recommended Next Step
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -358,21 +375,21 @@ export default function OpportunityDetail() {
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Users className="h-5 w-5" />
-                      Buyer Leads
+                      Potential Buyers
                     </CardTitle>
-                    <CardDescription>{leads.length} leads found</CardDescription>
+                    <CardDescription>{leads.length} contacts found</CardDescription>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={enrichLeads} disabled={isEnriching}>
                       {isEnriching ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Enriching...
+                          Finding Buyers...
                         </>
                       ) : (
                         <>
                           <Users className="mr-2 h-4 w-4" />
-                          Enrich Leads
+                          Find Buyers
                         </>
                       )}
                     </Button>
@@ -384,12 +401,23 @@ export default function OpportunityDetail() {
                 </div>
               </CardHeader>
               <CardContent>
+                {/* FullEnrich Clarification Note */}
+                <Alert className="mb-4 border-muted bg-muted/30">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-sm text-muted-foreground">
+                    Buyer contacts are generated using FullEnrich. If enrichment fails due to rate limits, 
+                    demo-safe sample leads will appear instead.
+                  </AlertDescription>
+                </Alert>
+
                 {leads.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Users className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                    <p className="text-muted-foreground">No buyer leads yet</p>
-                    <p className="text-sm text-muted-foreground">
-                      Click "Enrich Leads" to find potential buyers
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                      <Users className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium text-foreground">No buyers found yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Click "Find Buyers" to discover potential contacts
                     </p>
                   </div>
                 ) : (
@@ -450,7 +478,19 @@ export default function OpportunityDetail() {
             {/* Score Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Opportunity Score</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  Urgency Score
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs text-sm">
+                        Higher = more urgent to sell. Based on spoilage deadline, quantity, and price drop.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
               </CardHeader>
               <CardContent className="text-center">
                 <ScoreDisplay score={opportunity.score} size="lg" />
