@@ -71,26 +71,85 @@ const FALLBACK_LEADS = [
   },
 ];
 
+// Input validation helper
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return typeof str === "string" && uuidRegex.test(str);
+}
+
+function sanitizeString(str: unknown, maxLength: number): string | null {
+  if (str === null || str === undefined) return null;
+  if (typeof str !== "string") return null;
+  // Remove control characters and trim
+  const sanitized = str.replace(/[\x00-\x1F\x7F]/g, "").trim();
+  return sanitized.slice(0, maxLength);
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const { opportunityId, produceType, district } = await req.json();
+  // Only allow POST method
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
 
-    if (!opportunityId) {
+  try {
+    // Parse and validate request body
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
       return new Response(
-        JSON.stringify({ error: "opportunityId is required" }),
+        JSON.stringify({ error: "Invalid JSON body" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    if (!body || typeof body !== "object") {
+      return new Response(
+        JSON.stringify({ error: "Request body must be an object" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { opportunityId, produceType, district } = body as Record<string, unknown>;
+
+    // Validate opportunityId is a valid UUID
+    if (!opportunityId || !isValidUUID(String(opportunityId))) {
+      return new Response(
+        JSON.stringify({ error: "Valid opportunityId (UUID) is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Sanitize optional string inputs
+    const sanitizedProduceType = sanitizeString(produceType, 100);
+    const sanitizedDistrict = sanitizeString(district, 100);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Verify the opportunity exists before proceeding
+    const { data: opportunity, error: opError } = await supabase
+      .from("opportunities")
+      .select("id")
+      .eq("id", opportunityId)
+      .single();
+
+    if (opError || !opportunity) {
+      return new Response(
+        JSON.stringify({ error: "Opportunity not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Get FullEnrich API key
     const fullEnrichApiKey = Deno.env.get("FULLENRICH_API_KEY");
@@ -101,7 +160,7 @@ Deno.serve(async (req) => {
       try {
         // Call FullEnrich API
         // Note: Replace with actual FullEnrich API endpoint and format
-        const searchQuery = `${produceType} buyer ${district} Sierra Leone agriculture wholesale`;
+        const searchQuery = `${sanitizedProduceType || "produce"} buyer ${sanitizedDistrict || "Sierra Leone"} Sierra Leone agriculture wholesale`;
         
         const response = await fetch("https://api.fullenrich.com/v1/search", {
           method: "POST",
