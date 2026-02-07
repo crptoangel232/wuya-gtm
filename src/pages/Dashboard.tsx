@@ -8,12 +8,23 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PRODUCE_TYPES, DISTRICTS, URGENCY_LABELS, OPPORTUNITY_STATUS } from '@/lib/constants';
 import type { OpportunityStatus, UrgencyLabel } from '@/lib/constants';
-import { Eye, RefreshCw, Loader2 } from 'lucide-react';
+import { Eye, RefreshCw, Loader2, Bell, HelpCircle, Package } from 'lucide-react';
 import { format } from 'date-fns';
+
+const PRODUCE_ICONS: Record<string, string> = {
+  tomato: '🍅',
+  onion: '🧅',
+  rice: '🌾',
+  cassava: '🥔',
+  pepper: '🌶️',
+  potato: '🥔',
+  okra: '🥒',
+};
 
 interface OpportunityWithSignal {
   id: string;
@@ -124,13 +135,24 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8">
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-foreground">Opportunities Dashboard</h1>
+          <p className="mt-2 text-muted-foreground">
+            Browse produce available for purchase — prioritized by urgency
+          </p>
+        </div>
+
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-2xl">Opportunities Dashboard</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Package className="h-5 w-5" />
+                  Available Opportunities
+                </CardTitle>
                 <CardDescription>
-                  {filteredOpportunities.length} opportunities found
+                  {filteredOpportunities.length} {filteredOpportunities.length === 1 ? 'opportunity' : 'opportunities'} found
                 </CardDescription>
               </div>
               <Button variant="outline" size="sm" onClick={fetchOpportunities}>
@@ -149,8 +171,9 @@ export default function Dashboard() {
                 <SelectContent>
                   <SelectItem value="all">All Produce</SelectItem>
                   {PRODUCE_TYPES.map((type) => (
-                    <SelectItem key={type} value={type} className="capitalize">
-                      {type}
+                    <SelectItem key={type} value={type}>
+                      <span className="mr-2">{PRODUCE_ICONS[type] || '🥬'}</span>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -175,10 +198,10 @@ export default function Dashboard() {
                   <SelectValue placeholder="Filter by urgency" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Urgency</SelectItem>
+                  <SelectItem value="all">All Urgency Levels</SelectItem>
                   {URGENCY_LABELS.map((label) => (
                     <SelectItem key={label} value={label}>
-                      {label}
+                      {label} Urgency
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -206,12 +229,18 @@ export default function Dashboard() {
               </div>
             ) : filteredOpportunities.length === 0 ? (
               <div className="flex h-64 flex-col items-center justify-center text-center">
-                <p className="text-lg font-medium text-muted-foreground">No opportunities found</p>
-                <p className="text-sm text-muted-foreground">
-                  Try adjusting filters or submit a new signal
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                  <Package className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <p className="text-lg font-medium text-foreground">No opportunities yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  When sellers report produce, opportunities will appear here
                 </p>
                 <Button asChild className="mt-4">
-                  <Link to="/submit">Submit Signal</Link>
+                  <Link to="/report">
+                    <Bell className="mr-2 h-4 w-4" />
+                    Report a Spoilage Alert
+                  </Link>
                 </Button>
               </div>
             ) : (
@@ -222,19 +251,34 @@ export default function Dashboard() {
                       <TableHead>Produce</TableHead>
                       <TableHead>District</TableHead>
                       <TableHead>Quantity</TableHead>
-                      <TableHead className="text-center">Score</TableHead>
-                      <TableHead>Urgency</TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          Urgency Score
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs text-sm">
+                                Higher = more urgent to sell. Based on spoilage deadline, quantity, and price drop.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TableHead>
+                      <TableHead>Spoilage Risk</TableHead>
                       <TableHead className="max-w-[200px]">Recommended Action</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
+                      <TableHead>Reported</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredOpportunities.map((opp) => (
                       <TableRow key={opp.id}>
-                        <TableCell className="font-medium capitalize">
-                          {opp.signals?.produce_type}
+                        <TableCell className="font-medium">
+                          <span className="mr-2">{PRODUCE_ICONS[opp.signals?.produce_type || ''] || '🥬'}</span>
+                          <span className="capitalize">{opp.signals?.produce_type}</span>
                         </TableCell>
                         <TableCell>{opp.signals?.district}</TableCell>
                         <TableCell>

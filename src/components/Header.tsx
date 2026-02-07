@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Leaf, BarChart3 } from 'lucide-react';
+import { Leaf, BarChart3, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function Header() {
@@ -10,18 +10,21 @@ export function Header() {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
             <Leaf className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold text-foreground">WUYA AI</span>
+          <span className="text-xl font-bold text-foreground">WUYA</span>
         </Link>
 
         <nav className="flex items-center gap-4">
           <Button variant="ghost" asChild>
-            <Link to="/dashboard" className="flex items-center gap-2">
+            <Link to="/opportunities" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              Dashboard
+              Opportunities
             </Link>
           </Button>
           <Button asChild>
-            <Link to="/submit">Submit Signal</Link>
+            <Link to="/report" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Report Alert
+            </Link>
           </Button>
         </nav>
       </div>

@@ -11,7 +11,17 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { PRODUCE_TYPES, DISTRICTS, UNITS, PRICE_DROP_SEVERITY } from '@/lib/constants';
 import { calculateScore, getUrgencyLabel, getRecommendedAction } from '@/lib/scoring';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Bell, AlertTriangle } from 'lucide-react';
+
+const PRODUCE_ICONS: Record<string, string> = {
+  tomato: '🍅',
+  onion: '🧅',
+  rice: '🌾',
+  cassava: '🥔',
+  pepper: '🌶️',
+  potato: '🥔',
+  okra: '🥒',
+};
 
 export default function SignalSubmission() {
   const navigate = useNavigate();
@@ -94,13 +104,13 @@ export default function SignalSubmission() {
       if (opportunityError) throw opportunityError;
 
       toast({
-        title: 'Signal submitted!',
-        description: `Opportunity created with score ${score} (${urgencyLabel} urgency)`,
+        title: 'Alert submitted successfully!',
+        description: `Opportunity created with urgency score ${score} (${urgencyLabel})`,
       });
 
       navigate(`/opportunity/${opportunity.id}`);
     } catch (error) {
-      console.error('Error submitting signal:', error);
+      console.error('Error submitting alert:', error);
       toast({
         title: 'Submission failed',
         description: 'Something went wrong. Please try again.',
@@ -116,29 +126,44 @@ export default function SignalSubmission() {
       <Header />
       <main className="container mx-auto px-4 py-8">
         <div className="mx-auto max-w-2xl">
+          {/* Page Header */}
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <Bell className="h-8 w-8 text-primary" />
+            </div>
+            <h1 className="text-3xl font-bold text-foreground">Report a Spoilage Alert</h1>
+            <p className="mt-2 text-muted-foreground">
+              Help us connect your produce to buyers before it's too late
+            </p>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl">Submit a Market Signal</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <AlertTriangle className="h-5 w-5 text-secondary" />
+                Produce Details
+              </CardTitle>
               <CardDescription>
-                Report produce at risk of spoilage to create a scored opportunity
+                Tell us about the produce that needs to be sold quickly
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="produceType">Produce Type *</Label>
+                    <Label htmlFor="produceType">What are you selling? *</Label>
                     <Select
                       value={formData.produceType}
                       onValueChange={(value) => setFormData({ ...formData, produceType: value })}
                     >
                       <SelectTrigger id="produceType">
-                        <SelectValue placeholder="Select produce" />
+                        <SelectValue placeholder="Select produce type" />
                       </SelectTrigger>
                       <SelectContent>
                         {PRODUCE_TYPES.map((type) => (
                           <SelectItem key={type} value={type} className="capitalize">
-                            {type}
+                            <span className="mr-2">{PRODUCE_ICONS[type] || '🥬'}</span>
+                            {type.charAt(0).toUpperCase() + type.slice(1)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -146,7 +171,7 @@ export default function SignalSubmission() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="district">District *</Label>
+                    <Label htmlFor="district">Where is it located? *</Label>
                     <Select
                       value={formData.district}
                       onValueChange={(value) => setFormData({ ...formData, district: value })}
@@ -167,7 +192,7 @@ export default function SignalSubmission() {
 
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="quantity">Quantity *</Label>
+                    <Label htmlFor="quantity">How much do you have? *</Label>
                     <div className="flex gap-2">
                       <Input
                         id="quantity"
@@ -198,32 +223,37 @@ export default function SignalSubmission() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="harvestDeadline">Harvest Deadline (days until spoilage) *</Label>
+                    <Label htmlFor="harvestDeadline">Days until spoilage *</Label>
                     <Input
                       id="harvestDeadline"
                       type="number"
                       min="1"
                       max="30"
-                      placeholder="e.g., 3"
+                      placeholder="e.g., 3 days"
                       value={formData.harvestDeadlineDays}
                       onChange={(e) => setFormData({ ...formData, harvestDeadlineDays: e.target.value })}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      How many days before this produce is no longer sellable?
+                    </p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="priceDropSeverity">Price Drop Severity *</Label>
+                  <Label htmlFor="priceDropSeverity">How much has the price dropped? *</Label>
                   <Select
                     value={formData.priceDropSeverity}
                     onValueChange={(value) => setFormData({ ...formData, priceDropSeverity: value })}
                   >
                     <SelectTrigger id="priceDropSeverity">
-                      <SelectValue placeholder="Select severity" />
+                      <SelectValue placeholder="Select price drop severity" />
                     </SelectTrigger>
                     <SelectContent>
                       {PRICE_DROP_SEVERITY.map((severity) => (
                         <SelectItem key={severity} value={severity} className="capitalize">
-                          {severity.charAt(0).toUpperCase() + severity.slice(1)}
+                          {severity === 'low' && '📉 Low (10-20% below normal)'}
+                          {severity === 'medium' && '📉📉 Medium (20-40% below normal)'}
+                          {severity === 'high' && '📉📉📉 High (40%+ below normal)'}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -231,10 +261,10 @@ export default function SignalSubmission() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="notes">Notes (optional)</Label>
+                  <Label htmlFor="notes">Additional details (optional)</Label>
                   <Textarea
                     id="notes"
-                    placeholder="Additional context about the situation..."
+                    placeholder="Any other information buyers should know? (condition, storage, transport availability...)"
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     rows={3}
@@ -245,12 +275,12 @@ export default function SignalSubmission() {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Submitting...
+                      Submitting Alert...
                     </>
                   ) : (
                     <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Submit Signal
+                      <Bell className="mr-2 h-4 w-4" />
+                      Submit Spoilage Alert
                     </>
                   )}
                 </Button>
