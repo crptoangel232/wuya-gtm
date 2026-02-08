@@ -9,11 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PRODUCE_TYPES, DISTRICTS, URGENCY_LABELS, OPPORTUNITY_STATUS } from '@/lib/constants';
 import type { OpportunityStatus, UrgencyLabel } from '@/lib/constants';
-import { Eye, RefreshCw, Loader2, Bell, HelpCircle, Package } from 'lucide-react';
+import { Eye, RefreshCw, Loader2, Bell, HelpCircle, Package, Users, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 
 const PRODUCE_ICONS: Record<string, string> = {
@@ -39,11 +40,13 @@ interface OpportunityWithSignal {
     unit: string;
     district: string;
   } | null;
+  lead_count?: number;
 }
 
 export default function Dashboard() {
   const { toast } = useToast();
   const [opportunities, setOpportunities] = useState<OpportunityWithSignal[]>([]);
+  const [leadCounts, setLeadCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
 
@@ -76,6 +79,23 @@ export default function Dashboard() {
 
       if (error) throw error;
       setOpportunities(data || []);
+
+      // Fetch lead counts for all opportunities
+      if (data && data.length > 0) {
+        const opportunityIds = data.map(o => o.id);
+        const { data: leadsData, error: leadsError } = await supabase
+          .from('buyer_leads')
+          .select('opportunity_id')
+          .in('opportunity_id', opportunityIds);
+
+        if (!leadsError && leadsData) {
+          const counts: Record<string, number> = {};
+          leadsData.forEach(lead => {
+            counts[lead.opportunity_id] = (counts[lead.opportunity_id] || 0) + 1;
+          });
+          setLeadCounts(counts);
+        }
+      }
     } catch (error) {
       console.error('Error fetching opportunities:', error);
       toast({
@@ -90,6 +110,51 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchOpportunities();
+
+    // Set up realtime subscription for opportunities
+    const opportunitiesChannel = supabase
+      .channel('opportunities-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'opportunities',
+        },
+        (payload) => {
+          console.log('Opportunity change:', payload);
+          // Refetch to get updated data with joins
+          fetchOpportunities();
+        }
+      )
+      .subscribe();
+
+    // Set up realtime subscription for buyer_leads
+    const leadsChannel = supabase
+      .channel('leads-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'buyer_leads',
+        },
+        (payload) => {
+          console.log('New lead added:', payload);
+          // Update lead count for this opportunity
+          const newLead = payload.new as { opportunity_id: string };
+          setLeadCounts(prev => ({
+            ...prev,
+            [newLead.opportunity_id]: (prev[newLead.opportunity_id] || 0) + 1,
+          }));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(opportunitiesChannel);
+      supabase.removeChannel(leadsChannel);
+    };
   }, []);
 
   const updateStatus = async (opportunityId: string, newStatus: OpportunityStatus) => {
@@ -137,8 +202,14 @@ export default function Dashboard() {
       <main className="container mx-auto px-4 py-8">
         {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Opportunities Dashboard</h1>
-          <p className="mt-2 text-muted-foreground">
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-3xl font-bold text-foreground">Opportunities Dashboard</h1>
+            <Badge variant="outline" className="flex items-center gap-1 text-xs">
+              <Zap className="h-3 w-3" />
+              Live
+            </Badge>
+          </div>
+          <p className="text-muted-foreground">
             Browse produce available for purchase — prioritized by urgency
           </p>
         </div>
@@ -267,7 +338,12 @@ export default function Dashboard() {
                         </div>
                       </TableHead>
                       <TableHead>Spoilage Risk</TableHead>
-                      <TableHead className="max-w-[200px]">Recommended Action</TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Users className="h-3.5 w-3.5" />
+                          Leads
+                        </div>
+                      </TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Reported</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -290,8 +366,15 @@ export default function Dashboard() {
                         <TableCell>
                           <UrgencyBadge urgency={opp.urgency_label as UrgencyLabel} />
                         </TableCell>
-                        <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
-                          {opp.recommended_action}
+                        <TableCell className="text-center">
+                          {leadCounts[opp.id] ? (
+                            <Badge variant="secondary" className="gap-1">
+                              <Users className="h-3 w-3" />
+                              {leadCounts[opp.id]}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Select

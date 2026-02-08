@@ -7,70 +7,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Fallback demo leads when FullEnrich API fails or returns empty
-const FALLBACK_LEADS = [
-  {
-    name: "Amadu Koroma",
-    company: "Freetown Fresh Foods",
-    role: "Procurement Manager",
-    email: "amadu.k@freetownfresh.sl",
-    phone: "+232 76 123 456",
-    linkedin_url: "https://linkedin.com/in/amadukoroma",
-    location: "Freetown, Western Area",
-    source: "Demo Data",
-  },
-  {
-    name: "Fatmata Sesay",
-    company: "Sierra Exports Ltd",
-    role: "Supply Chain Director",
-    email: "f.sesay@sierraexports.com",
-    phone: "+232 77 234 567",
-    linkedin_url: "https://linkedin.com/in/fatmatasesay",
-    location: "Freetown, Western Area",
-    source: "Demo Data",
-  },
-  {
-    name: "Mohamed Bangura",
-    company: "Makeni Wholesale Market",
-    role: "Operations Head",
-    email: "mbangura@makeniwholesale.sl",
-    phone: "+232 78 345 678",
-    linkedin_url: "https://linkedin.com/in/mohamedbangura",
-    location: "Makeni, Bombali",
-    source: "Demo Data",
-  },
-  {
-    name: "Mariama Conteh",
-    company: "Bo District Traders Association",
-    role: "President",
-    email: "m.conteh@botraders.org",
-    phone: "+232 76 456 789",
-    linkedin_url: "https://linkedin.com/in/mariamaconteh",
-    location: "Bo, Bo District",
-    source: "Demo Data",
-  },
-  {
-    name: "Ibrahim Kamara",
-    company: "National Food Security Agency",
-    role: "Regional Coordinator",
-    email: "i.kamara@nfsa.gov.sl",
-    phone: "+232 77 567 890",
-    linkedin_url: "https://linkedin.com/in/ibrahimkamara",
-    location: "Kenema, Kenema District",
-    source: "Demo Data",
-  },
-  {
-    name: "Hawa Jalloh",
-    company: "Green Valley Supermarket",
-    role: "Buyer",
-    email: "hawa@greenvalleysl.com",
-    phone: "+232 78 678 901",
-    linkedin_url: "https://linkedin.com/in/hawajalloh",
-    location: "Freetown, Western Area",
-    source: "Demo Data",
-  },
-];
-
 // Input validation helper
 function isValidUUID(str: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -80,7 +16,6 @@ function isValidUUID(str: string): boolean {
 function sanitizeString(str: unknown, maxLength: number): string | null {
   if (str === null || str === undefined) return null;
   if (typeof str !== "string") return null;
-  // Remove control characters and trim
   const sanitized = str.replace(/[\x00-\x1F\x7F]/g, "").trim();
   return sanitized.slice(0, maxLength);
 }
@@ -151,63 +86,97 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get FullEnrich API key
+    // Get FullEnrich API key - REQUIRED for real mode
     const fullEnrichApiKey = Deno.env.get("FULLENRICH_API_KEY");
 
-    let enrichedLeads: typeof FALLBACK_LEADS = [];
-
-    if (fullEnrichApiKey) {
-      try {
-        // Call FullEnrich API
-        // Note: Replace with actual FullEnrich API endpoint and format
-        const searchQuery = `${sanitizedProduceType || "produce"} buyer ${sanitizedDistrict || "Sierra Leone"} Sierra Leone agriculture wholesale`;
-        
-        const response = await fetch("https://api.fullenrich.com/v1/search", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${fullEnrichApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            query: searchQuery,
-            limit: 10,
-            filters: {
-              industries: ["agriculture", "food", "wholesale", "retail"],
-              locations: ["Sierra Leone"],
-            },
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          
-          // Map FullEnrich response to our lead format
-          if (data.results && data.results.length > 0) {
-            enrichedLeads = data.results.map((result: any) => ({
-              name: result.full_name || result.name || "Unknown",
-              company: result.company || result.organization || null,
-              role: result.title || result.job_title || null,
-              email: result.email || null,
-              phone: result.phone || result.mobile || null,
-              linkedin_url: result.linkedin_url || result.linkedin || null,
-              location: result.location || result.city || null,
-              source: "FullEnrich",
-            }));
-          }
-        } else {
-          console.log("FullEnrich API returned non-OK status:", response.status);
-        }
-      } catch (apiError) {
-        console.log("FullEnrich API error, using fallback:", apiError);
-      }
+    if (!fullEnrichApiKey) {
+      return new Response(
+        JSON.stringify({ 
+          error: "FullEnrich API key not configured",
+          message: "Please configure the FULLENRICH_API_KEY secret to enable lead enrichment"
+        }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // If no leads from FullEnrich, use fallback demo data
-    if (enrichedLeads.length === 0) {
-      console.log("Using fallback demo leads");
-      // Randomly select 3-5 leads from fallback data
-      const shuffled = [...FALLBACK_LEADS].sort(() => 0.5 - Math.random());
-      enrichedLeads = shuffled.slice(0, Math.floor(Math.random() * 3) + 3);
+    interface EnrichedLead {
+      name: string;
+      company: string | null;
+      role: string | null;
+      email: string | null;
+      phone: string | null;
+      linkedin_url: string | null;
+      location: string | null;
+      source: string;
+    }
+
+    let enrichedLeads: EnrichedLead[] = [];
+
+    try {
+      // Call FullEnrich API
+      const searchQuery = `${sanitizedProduceType || "produce"} buyer ${sanitizedDistrict || "Sierra Leone"} Sierra Leone agriculture wholesale`;
+      
+      const response = await fetch("https://api.fullenrich.com/v1/search", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${fullEnrichApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: searchQuery,
+          limit: 10,
+          filters: {
+            industries: ["agriculture", "food", "wholesale", "retail"],
+            locations: ["Sierra Leone"],
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("FullEnrich API error:", response.status, errorText);
+        return new Response(
+          JSON.stringify({ 
+            error: "FullEnrich API request failed",
+            status: response.status,
+            message: `API returned status ${response.status}. Please check your API key and try again.`
+          }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const data = await response.json();
+      
+      // Map FullEnrich response to our lead format
+      if (data.results && data.results.length > 0) {
+        enrichedLeads = data.results.map((result: Record<string, unknown>) => ({
+          name: result.full_name || result.name || "Unknown",
+          company: result.company || result.organization || null,
+          role: result.title || result.job_title || null,
+          email: result.email || null,
+          phone: result.phone || result.mobile || null,
+          linkedin_url: result.linkedin_url || result.linkedin || null,
+          location: result.location || result.city || null,
+          source: "FullEnrich",
+        }));
+      } else {
+        return new Response(
+          JSON.stringify({ 
+            error: "No leads found",
+            message: "FullEnrich returned no matching contacts. Try adjusting search criteria."
+          }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } catch (apiError) {
+      console.error("FullEnrich API error:", apiError);
+      return new Response(
+        JSON.stringify({ 
+          error: "FullEnrich API connection failed",
+          message: "Could not connect to FullEnrich. Please try again later."
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Check for existing leads to avoid duplicates
@@ -236,6 +205,7 @@ Deno.serve(async (req) => {
         location: lead.location,
         source: lead.source,
         enrichment_json: lead,
+        export_status: 'not_exported',
       }));
 
       const { error: insertError } = await supabase
@@ -252,8 +222,8 @@ Deno.serve(async (req) => {
         success: true,
         leadsAdded: newLeads.length,
         message: newLeads.length > 0 
-          ? `Added ${newLeads.length} new buyer leads` 
-          : "No new leads to add",
+          ? `Added ${newLeads.length} new buyer leads from FullEnrich` 
+          : "No new leads to add (all contacts already exist)",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

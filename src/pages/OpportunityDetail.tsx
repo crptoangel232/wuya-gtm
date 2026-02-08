@@ -8,15 +8,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getScoreBreakdown } from '@/lib/scoring';
 import { exportOpportunityToCsv, exportLeadsToCsv, downloadCsv } from '@/lib/csv-export';
 import { OPPORTUNITY_STATUS } from '@/lib/constants';
 import type { OpportunityStatus, UrgencyLabel, PriceDropSeverity } from '@/lib/constants';
-import { ArrowLeft, Download, Users, Loader2, ExternalLink, MapPin, Package, Clock, TrendingDown, Target, Info, HelpCircle } from 'lucide-react';
+import { 
+  ArrowLeft, Download, Users, Loader2, ExternalLink, MapPin, Package, 
+  Clock, TrendingDown, Target, AlertCircle, HelpCircle, Upload, CheckCircle, XCircle
+} from 'lucide-react';
 import { format } from 'date-fns';
 
 const PRODUCE_ICONS: Record<string, string> = {
@@ -27,6 +34,12 @@ const PRODUCE_ICONS: Record<string, string> = {
   pepper: '🌶️',
   potato: '🥔',
   okra: '🥒',
+};
+
+const CRM_ICONS: Record<string, string> = {
+  hubspot: '🟠',
+  salesforce: '🔵',
+  pipedrive: '🟢',
 };
 
 interface Signal {
@@ -62,16 +75,40 @@ interface BuyerLead {
   linkedin_url: string | null;
   location: string | null;
   source: string | null;
+  export_status: string | null;
+  exported_at: string | null;
 }
+
+interface CrmExport {
+  id: string;
+  crm_type: string;
+  leads_count: number;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+}
+
+type CrmType = 'hubspot' | 'salesforce' | 'pipedrive';
 
 export default function OpportunityDetail() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [leads, setLeads] = useState<BuyerLead[]>([]);
+  const [exports, setExports] = useState<CrmExport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEnriching, setIsEnriching] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isExporting, setIsExporting] = useState<CrmType | null>(null);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
+  
+  // CRM webhook URLs
+  const [webhookUrls, setWebhookUrls] = useState<Record<CrmType, string>>({
+    hubspot: '',
+    salesforce: '',
+    pipedrive: '',
+  });
+  const [showWebhookDialog, setShowWebhookDialog] = useState<CrmType | null>(null);
 
   const fetchData = async () => {
     if (!id) return;
@@ -100,6 +137,17 @@ export default function OpportunityDetail() {
 
       if (leadsError) throw leadsError;
       setLeads(leadsData || []);
+
+      // Fetch export history
+      const { data: exportsData, error: exportsError } = await supabase
+        .from('crm_exports')
+        .select('*')
+        .eq('opportunity_id', id)
+        .order('created_at', { ascending: false });
+
+      if (!exportsError) {
+        setExports(exportsData || []);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -113,6 +161,27 @@ export default function OpportunityDetail() {
 
   useEffect(() => {
     fetchData();
+
+    // Subscribe to realtime updates for leads
+    const leadsChannel = supabase
+      .channel(`leads-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'buyer_leads',
+          filter: `opportunity_id=eq.${id}`,
+        },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(leadsChannel);
+    };
   }, [id]);
 
   const updateStatus = async (newStatus: OpportunityStatus) => {
@@ -141,6 +210,8 @@ export default function OpportunityDetail() {
     if (!opportunity) return;
     
     setIsEnriching(true);
+    setEnrichError(null);
+    
     try {
       const response = await supabase.functions.invoke('enrich-leads', {
         body: {
@@ -150,30 +221,85 @@ export default function OpportunityDetail() {
         },
       });
 
-      if (response.error) throw response.error;
+      if (response.error) {
+        throw new Error(response.error.message || 'Enrichment failed');
+      }
+
+      if (response.data.error) {
+        setEnrichError(response.data.message || response.data.error);
+        toast({
+          title: 'Enrichment failed',
+          description: response.data.message,
+          variant: 'destructive',
+        });
+        return;
+      }
 
       toast({
         title: 'Buyers found!',
-        description: `Added ${response.data.leadsAdded} potential buyer contacts`,
+        description: response.data.message,
       });
 
       // Refetch leads
-      const { data: leadsData } = await supabase
-        .from('buyer_leads')
-        .select('*')
-        .eq('opportunity_id', id)
-        .order('created_at', { ascending: false });
-
-      setLeads(leadsData || []);
+      fetchData();
     } catch (error) {
       console.error('Error enriching leads:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Could not fetch buyer contacts';
+      setEnrichError(errorMessage);
       toast({
         title: 'Enrichment failed',
-        description: 'Could not fetch buyer contacts. Using fallback data.',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
       setIsEnriching(false);
+    }
+  };
+
+  const exportToCrm = async (crmType: CrmType, webhookUrl?: string) => {
+    if (!opportunity || leads.length === 0) return;
+    
+    setIsExporting(crmType);
+    setShowWebhookDialog(null);
+    
+    try {
+      const response = await supabase.functions.invoke('export-to-crm', {
+        body: {
+          opportunityId: opportunity.id,
+          crmType,
+          webhookUrl: webhookUrl || undefined,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Export failed');
+      }
+
+      if (!response.data.success) {
+        toast({
+          title: 'Export failed',
+          description: response.data.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Export successful!',
+        description: response.data.message,
+      });
+
+      // Refetch to update export status
+      fetchData();
+    } catch (error) {
+      console.error('Error exporting to CRM:', error);
+      toast({
+        title: 'Export failed',
+        description: error instanceof Error ? error.message : 'Could not export to CRM',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(null);
     }
   };
 
@@ -221,6 +347,25 @@ export default function OpportunityDetail() {
 
     downloadCsv(csv, `leads-${id}.csv`);
     toast({ title: 'Leads exported' });
+  };
+
+  const getExportStatusBadge = (status: string | null) => {
+    if (!status || status === 'not_exported') {
+      return <Badge variant="outline" className="text-xs">Not exported</Badge>;
+    }
+    if (status === 'failed') {
+      return <Badge variant="destructive" className="text-xs gap-1"><XCircle className="h-3 w-3" />Failed</Badge>;
+    }
+    if (status.startsWith('exported_to_')) {
+      const crm = status.replace('exported_to_', '');
+      return (
+        <Badge variant="secondary" className="text-xs gap-1">
+          <CheckCircle className="h-3 w-3" />
+          {crm.charAt(0).toUpperCase() + crm.slice(1)}
+        </Badge>
+      );
+    }
+    return <Badge variant="outline" className="text-xs">{status}</Badge>;
   };
 
   if (isLoading) {
@@ -401,14 +546,19 @@ export default function OpportunityDetail() {
                 </div>
               </CardHeader>
               <CardContent>
-                {/* FullEnrich Clarification Note */}
-                <Alert className="mb-4 border-muted bg-muted/30">
-                  <Info className="h-4 w-4" />
-                  <AlertDescription className="text-sm text-muted-foreground">
-                    Buyer contacts are generated using FullEnrich. If enrichment fails due to rate limits, 
-                    demo-safe sample leads will appear instead.
-                  </AlertDescription>
-                </Alert>
+                {/* Enrichment Error Alert */}
+                {enrichError && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Enrichment Failed</AlertTitle>
+                    <AlertDescription className="flex items-center justify-between">
+                      <span>{enrichError}</span>
+                      <Button variant="outline" size="sm" onClick={enrichLeads} disabled={isEnriching}>
+                        Retry
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
 
                 {leads.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -417,7 +567,7 @@ export default function OpportunityDetail() {
                     </div>
                     <p className="font-medium text-foreground">No buyers found yet</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Click "Find Buyers" to discover potential contacts
+                      Click "Find Buyers" to discover potential contacts via FullEnrich
                     </p>
                   </div>
                 ) : (
@@ -430,6 +580,7 @@ export default function OpportunityDetail() {
                           <TableHead>Role</TableHead>
                           <TableHead>Email</TableHead>
                           <TableHead>Phone</TableHead>
+                          <TableHead>Export Status</TableHead>
                           <TableHead>LinkedIn</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -441,7 +592,7 @@ export default function OpportunityDetail() {
                             <TableCell>{lead.role || '-'}</TableCell>
                             <TableCell>
                               {lead.email ? (
-                                <a href={`mailto:${lead.email}`} className="text-accent hover:underline">
+                                <a href={`mailto:${lead.email}`} className="text-primary hover:underline">
                                   {lead.email}
                                 </a>
                               ) : (
@@ -450,12 +601,15 @@ export default function OpportunityDetail() {
                             </TableCell>
                             <TableCell>{lead.phone || '-'}</TableCell>
                             <TableCell>
+                              {getExportStatusBadge(lead.export_status)}
+                            </TableCell>
+                            <TableCell>
                               {lead.linkedin_url ? (
                                 <a
                                   href={lead.linkedin_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-accent hover:underline"
+                                  className="text-primary hover:underline"
                                 >
                                   <ExternalLink className="h-4 w-4" />
                                 </a>
@@ -467,6 +621,121 @@ export default function OpportunityDetail() {
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* CRM Export Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Export to CRM
+                </CardTitle>
+                <CardDescription>
+                  Push leads directly to your CRM system
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {(['hubspot', 'salesforce', 'pipedrive'] as CrmType[]).map((crm) => (
+                    <Dialog key={crm} open={showWebhookDialog === crm} onOpenChange={(open) => setShowWebhookDialog(open ? crm : null)}>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="h-auto flex-col gap-2 py-4"
+                          disabled={leads.length === 0 || isExporting !== null}
+                        >
+                          {isExporting === crm ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                          ) : (
+                            <span className="text-2xl">{CRM_ICONS[crm]}</span>
+                          )}
+                          <span className="font-medium">
+                            Push to {crm.charAt(0).toUpperCase() + crm.slice(1)}
+                          </span>
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <span className="text-xl">{CRM_ICONS[crm]}</span>
+                            Export to {crm.charAt(0).toUpperCase() + crm.slice(1)}
+                          </DialogTitle>
+                          <DialogDescription>
+                            Enter your {crm.charAt(0).toUpperCase() + crm.slice(1)} webhook URL to push {leads.length} leads directly. 
+                            Leave empty to record the export without sending data.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="space-y-2">
+                            <Label htmlFor={`${crm}-webhook`}>Webhook URL (optional)</Label>
+                            <Input
+                              id={`${crm}-webhook`}
+                              placeholder="https://hooks.zapier.com/..."
+                              value={webhookUrls[crm]}
+                              onChange={(e) => setWebhookUrls(prev => ({ ...prev, [crm]: e.target.value }))}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Use Zapier, Make, or n8n to create a webhook that pushes to {crm.charAt(0).toUpperCase() + crm.slice(1)}.
+                            </p>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setShowWebhookDialog(null)}>
+                            Cancel
+                          </Button>
+                          <Button onClick={() => exportToCrm(crm, webhookUrls[crm] || undefined)}>
+                            {webhookUrls[crm] ? 'Push to Webhook' : 'Record Export'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  ))}
+                </div>
+
+                {/* Export History */}
+                {exports.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="mb-3 text-sm font-medium text-muted-foreground">Export History</h4>
+                    <div className="space-y-2">
+                      {exports.slice(0, 5).map((exp) => (
+                        <div key={exp.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2">
+                          <div className="flex items-center gap-3">
+                            <span>{CRM_ICONS[exp.crm_type] || '📤'}</span>
+                            <div>
+                              <p className="text-sm font-medium">
+                                {exp.crm_type.charAt(0).toUpperCase() + exp.crm_type.slice(1)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {exp.leads_count} leads • {format(new Date(exp.created_at), 'MMM d, h:mm a')}
+                              </p>
+                            </div>
+                          </div>
+                          {exp.status === 'success' ? (
+                            <Badge variant="secondary" className="gap-1">
+                              <CheckCircle className="h-3 w-3" />
+                              Success
+                            </Badge>
+                          ) : exp.status === 'failed' ? (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Badge variant="destructive" className="gap-1">
+                                  <XCircle className="h-3 w-3" />
+                                  Failed
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs text-sm">{exp.error_message}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <Badge variant="outline">Pending</Badge>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
