@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Leaf, BarChart3, Bell } from 'lucide-react';
+import { Leaf, BarChart3, Bell, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function Header() {
@@ -18,6 +18,12 @@ export function Header() {
             <Link to="/opportunities" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Opportunities
+            </Link>
+          </Button>
+          <Button variant="ghost" asChild>
+            <Link to="/leads" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Leads
             </Link>
           </Button>
           <Button asChild>

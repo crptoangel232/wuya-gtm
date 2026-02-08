@@ -20,6 +20,9 @@ export type Database = {
           created_at: string
           email: string | null
           enrichment_json: Json | null
+          export_error: string | null
+          export_status: string | null
+          exported_at: string | null
           id: string
           linkedin_url: string | null
           location: string | null
@@ -34,6 +37,9 @@ export type Database = {
           created_at?: string
           email?: string | null
           enrichment_json?: Json | null
+          export_error?: string | null
+          export_status?: string | null
+          exported_at?: string | null
           id?: string
           linkedin_url?: string | null
           location?: string | null
@@ -48,6 +54,9 @@ export type Database = {
           created_at?: string
           email?: string | null
           enrichment_json?: Json | null
+          export_error?: string | null
+          export_status?: string | null
+          exported_at?: string | null
           id?: string
           linkedin_url?: string | null
           location?: string | null
@@ -60,6 +69,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "buyer_leads_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_exports: {
+        Row: {
+          created_at: string
+          crm_type: string
+          error_message: string | null
+          id: string
+          leads_count: number
+          opportunity_id: string
+          status: string
+          webhook_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          crm_type: string
+          error_message?: string | null
+          id?: string
+          leads_count?: number
+          opportunity_id: string
+          status?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          crm_type?: string
+          error_message?: string | null
+          id?: string
+          leads_count?: number
+          opportunity_id?: string
+          status?: string
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_exports_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "opportunities"

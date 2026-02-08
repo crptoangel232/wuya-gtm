@@ -7,6 +7,7 @@ import Landing from "./pages/Landing";
 import SignalSubmission from "./pages/SignalSubmission";
 import Dashboard from "./pages/Dashboard";
 import OpportunityDetail from "./pages/OpportunityDetail";
+import LeadsPage from "./pages/LeadsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/report" element={<SignalSubmission />} />
           <Route path="/opportunities" element={<Dashboard />} />
           <Route path="/opportunity/:id" element={<OpportunityDetail />} />
+          <Route path="/leads" element={<LeadsPage />} />
           {/* Legacy route redirects */}
           <Route path="/submit" element={<Navigate to="/report" replace />} />
           <Route path="/dashboard" element={<Navigate to="/opportunities" replace />} />
