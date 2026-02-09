@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 interface ScoreDisplayProps {
@@ -6,22 +7,28 @@ interface ScoreDisplayProps {
   className?: string;
 }
 
-export function ScoreDisplay({ score, size = 'md', className }: ScoreDisplayProps) {
-  const getScoreColor = (s: number) => {
-    if (s >= 70) return 'text-urgency-high';
-    if (s >= 40) return 'text-urgency-medium';
-    return 'text-urgency-low';
-  };
+const ScoreDisplay = React.forwardRef<HTMLSpanElement, ScoreDisplayProps>(
+  ({ score, size = 'md', className }, ref) => {
+    const getScoreColor = (s: number) => {
+      if (s >= 70) return 'text-urgency-high';
+      if (s >= 40) return 'text-urgency-medium';
+      return 'text-urgency-low';
+    };
 
-  const sizeClasses = {
-    sm: 'text-lg font-bold',
-    md: 'text-2xl font-bold',
-    lg: 'text-4xl font-bold',
-  };
+    const sizeClasses = {
+      sm: 'text-lg font-bold',
+      md: 'text-2xl font-bold',
+      lg: 'text-4xl font-bold',
+    };
 
-  return (
-    <span className={cn(getScoreColor(score), sizeClasses[size], className)}>
-      {score}
-    </span>
-  );
-}
+    return (
+      <span ref={ref} className={cn(getScoreColor(score), sizeClasses[size], className)}>
+        {score}
+      </span>
+    );
+  }
+);
+
+ScoreDisplay.displayName = 'ScoreDisplay';
+
+export { ScoreDisplay };
