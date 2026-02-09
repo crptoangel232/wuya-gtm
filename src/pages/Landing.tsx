@@ -5,6 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+// Import real Sierra Leone images
+import heroFarmerImage from '@/assets/hero-farmer.png';
+import communityFarmingImage from '@/assets/community-farming.png';
+
 const PRODUCE_ICONS: Record<string, string> = {
   tomato: '🍅',
   onion: '🧅',
@@ -130,19 +134,17 @@ export default function Landing() {
                 </div>
               </div>
               
-              {/* Hero Image Placeholder */}
+              {/* Hero Image */}
               <div className="relative hidden lg:block">
-                <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-secondary/10 to-muted border-2 border-dashed border-primary/30">
-                  <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-                    <div className="mb-4 text-6xl">🌍🥬🍅</div>
-                    <p className="text-sm text-muted-foreground">
-                      Replace with Sierra Leone market image
-                    </p>
-                    <p className="mt-2 text-xs text-muted-foreground/70">
-                      Suggested: Farmers at a local market, produce stalls, or field workers
-                    </p>
-                  </div>
+                <div className="aspect-square overflow-hidden rounded-2xl shadow-2xl">
+                  <img 
+                    src={heroFarmerImage} 
+                    alt="Sierra Leone farmer harvesting rice in the fields" 
+                    className="h-full w-full object-cover"
+                  />
                 </div>
+                {/* Decorative overlay */}
+                <div className="absolute -bottom-4 -right-4 -z-10 h-full w-full rounded-2xl bg-primary/20" />
               </div>
             </div>
           </div>
@@ -268,17 +270,13 @@ export default function Landing() {
         <section className="bg-muted/30 py-16">
           <div className="container mx-auto px-4">
             <div className="mx-auto grid max-w-5xl items-center gap-12 lg:grid-cols-2">
-              {/* Image Placeholder */}
-              <div className="aspect-video overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 via-muted to-secondary/10 border-2 border-dashed border-muted-foreground/30">
-                <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-                  <div className="mb-4 text-5xl">👨‍🌾👩‍🌾🤝</div>
-                  <p className="text-sm text-muted-foreground">
-                    Replace with community/farming image
-                  </p>
-                  <p className="mt-2 text-xs text-muted-foreground/70">
-                    Suggested: Local farmers, community gathering, or produce exchange
-                  </p>
-                </div>
+              {/* Community Farming Image */}
+              <div className="aspect-video overflow-hidden rounded-xl shadow-xl">
+                <img 
+                  src={communityFarmingImage} 
+                  alt="Sierra Leone farmers working together harvesting vegetables" 
+                  className="h-full w-full object-cover"
+                />
               </div>
               
               <div>
