@@ -11,10 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { exportLeadsToCsv, downloadCsv } from '@/lib/csv-export';
 import { DISTRICTS } from '@/lib/constants';
-import { 
-  Download, Users, Loader2, ExternalLink, Search, RefreshCw, 
-  CheckCircle, XCircle, Eye, Zap
-} from 'lucide-react';
+import { Download, Users, Loader2, ExternalLink, Search, RefreshCw, CheckCircle, XCircle, Eye, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Lead {
@@ -34,10 +31,7 @@ interface Lead {
   opportunities?: {
     id: string;
     score: number;
-    signals?: {
-      produce_type: string;
-      district: string;
-    } | null;
+    signals?: { produce_type: string; district: string } | null;
   } | null;
 }
 
@@ -45,8 +39,6 @@ export default function LeadsPage() {
   const { toast } = useToast();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [districtFilter, setDistrictFilter] = useState<string>('all');
   const [exportStatusFilter, setExportStatusFilter] = useState<string>('all');
@@ -56,27 +48,12 @@ export default function LeadsPage() {
     try {
       const { data, error } = await supabase
         .from('buyer_leads')
-        .select(`
-          *,
-          opportunities (
-            id,
-            score,
-            signals (
-              produce_type,
-              district
-            )
-          )
-        `)
+        .select('*, opportunities (id, score, signals (produce_type, district))')
         .order('created_at', { ascending: false });
-
       if (error) throw error;
       setLeads(data || []);
-    } catch (error) {
-      console.error('Error fetching leads:', error);
-      toast({
-        title: 'Error loading leads',
-        variant: 'destructive',
-      });
+    } catch {
+      toast({ title: 'Could not load contacts', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -84,98 +61,40 @@ export default function LeadsPage() {
 
   useEffect(() => {
     fetchLeads();
-
-    // Subscribe to realtime updates
-    const channel = supabase
-      .channel('all-leads')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'buyer_leads',
-        },
-        () => {
-          fetchLeads();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const ch = supabase.channel('all-leads').on('postgres_changes', { event: '*', schema: 'public', table: 'buyer_leads' }, () => fetchLeads()).subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, []);
 
-  const filteredLeads = leads.filter((lead) => {
-    // Search filter
+  const filtered = leads.filter((lead) => {
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch = 
-        lead.name.toLowerCase().includes(query) ||
-        lead.company?.toLowerCase().includes(query) ||
-        lead.email?.toLowerCase().includes(query) ||
-        lead.role?.toLowerCase().includes(query);
-      if (!matchesSearch) return false;
+      const q = searchQuery.toLowerCase();
+      if (![lead.name, lead.company, lead.email, lead.role].some(f => f?.toLowerCase().includes(q))) return false;
     }
-
-    // District filter
-    if (districtFilter !== 'all') {
-      const leadDistrict = lead.opportunities?.signals?.district;
-      if (leadDistrict !== districtFilter) return false;
-    }
-
-    // Export status filter
-    if (exportStatusFilter !== 'all') {
-      if (exportStatusFilter === 'exported') {
-        if (!lead.export_status || lead.export_status === 'not_exported') return false;
-      } else if (exportStatusFilter === 'not_exported') {
-        if (lead.export_status && lead.export_status !== 'not_exported') return false;
-      } else if (exportStatusFilter === 'failed') {
-        if (lead.export_status !== 'failed') return false;
-      }
-    }
-
+    if (districtFilter !== 'all' && lead.opportunities?.signals?.district !== districtFilter) return false;
+    if (exportStatusFilter === 'exported' && (!lead.export_status || lead.export_status === 'not_exported')) return false;
+    if (exportStatusFilter === 'not_exported' && lead.export_status && lead.export_status !== 'not_exported') return false;
+    if (exportStatusFilter === 'failed' && lead.export_status !== 'failed') return false;
     return true;
   });
 
-  const handleExportLeads = () => {
-    if (filteredLeads.length === 0) {
-      toast({ title: 'No leads to export', variant: 'destructive' });
-      return;
-    }
-
-    const csv = exportLeadsToCsv(
-      filteredLeads.map((lead) => ({
-        name: lead.name,
-        company: lead.company || undefined,
-        role: lead.role || undefined,
-        email: lead.email || undefined,
-        phone: lead.phone || undefined,
-        linkedinUrl: lead.linkedin_url || undefined,
-        location: lead.location || undefined,
-        source: lead.source || undefined,
-      }))
-    );
-
-    downloadCsv(csv, `all-leads-${format(new Date(), 'yyyy-MM-dd')}.csv`);
-    toast({ title: `Exported ${filteredLeads.length} leads` });
+  const handleExport = () => {
+    if (filtered.length === 0) return;
+    const csv = exportLeadsToCsv(filtered.map(l => ({
+      name: l.name, company: l.company || undefined, role: l.role || undefined,
+      email: l.email || undefined, phone: l.phone || undefined,
+      linkedinUrl: l.linkedin_url || undefined, location: l.location || undefined,
+      source: l.source || undefined,
+    })));
+    downloadCsv(csv, `buyer-contacts-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    toast({ title: `Exported ${filtered.length} contacts` });
   };
 
-  const getExportStatusBadge = (status: string | null) => {
-    if (!status || status === 'not_exported') {
-      return <Badge variant="outline" className="text-xs">Not exported</Badge>;
-    }
-    if (status === 'failed') {
-      return <Badge variant="destructive" className="text-xs gap-1"><XCircle className="h-3 w-3" />Failed</Badge>;
-    }
+  const getExportBadge = (status: string | null) => {
+    if (!status || status === 'not_exported') return <Badge variant="outline" className="text-xs">Not exported</Badge>;
+    if (status === 'failed') return <Badge variant="destructive" className="text-xs gap-1"><XCircle className="h-3 w-3" />Failed</Badge>;
     if (status.startsWith('exported_to_')) {
       const crm = status.replace('exported_to_', '');
-      return (
-        <Badge variant="secondary" className="text-xs gap-1">
-          <CheckCircle className="h-3 w-3" />
-          {crm.charAt(0).toUpperCase() + crm.slice(1)}
-        </Badge>
-      );
+      return <Badge variant="secondary" className="text-xs gap-1"><CheckCircle className="h-3 w-3" />{crm.charAt(0).toUpperCase() + crm.slice(1)}</Badge>;
     }
     return <Badge variant="outline" className="text-xs">{status}</Badge>;
   };
@@ -184,75 +103,46 @@ export default function LeadsPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8">
-        {/* Page Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-3xl font-bold text-foreground">All Buyer Leads</h1>
-            <Badge variant="outline" className="flex items-center gap-1 text-xs">
-              <Zap className="h-3 w-3" />
-              Live
-            </Badge>
+            <h1 className="text-3xl font-bold text-foreground">Buyer Contacts</h1>
+            <Badge variant="outline" className="flex items-center gap-1 text-xs"><Zap className="h-3 w-3" />Live</Badge>
           </div>
-          <p className="text-muted-foreground">
-            View and manage all enriched buyer contacts across opportunities
-          </p>
+          <p className="text-muted-foreground">All verified buyer contacts across opportunities</p>
         </div>
 
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Users className="h-5 w-5" />
-                  Buyer Contacts
-                </CardTitle>
-                <CardDescription>
-                  {filteredLeads.length} of {leads.length} leads
-                </CardDescription>
+                <CardTitle className="flex items-center gap-2 text-xl"><Users className="h-5 w-5" />All Contacts</CardTitle>
+                <CardDescription>{filtered.length} of {leads.length} contacts</CardDescription>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={fetchLeads}>
-                  <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                  Refresh
+                  <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />Refresh
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleExportLeads} disabled={filteredLeads.length === 0}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Export CSV
+                <Button variant="outline" size="sm" onClick={handleExport} disabled={filtered.length === 0}>
+                  <Download className="mr-2 h-4 w-4" />Export CSV
                 </Button>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            {/* Filters */}
             <div className="mb-6 grid gap-4 md:grid-cols-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search leads..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
+                <Input placeholder="Search contacts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
               </div>
-
               <Select value={districtFilter} onValueChange={setDistrictFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by district" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="All Districts" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Districts</SelectItem>
-                  {DISTRICTS.map((district) => (
-                    <SelectItem key={district} value={district}>
-                      {district}
-                    </SelectItem>
-                  ))}
+                  {DISTRICTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
-
               <Select value={exportStatusFilter} onValueChange={setExportStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by export status" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="All Status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="not_exported">Not Exported</SelectItem>
@@ -262,27 +152,16 @@ export default function LeadsPage() {
               </Select>
             </div>
 
-            {/* Table */}
             {isLoading ? (
-              <div className="flex h-64 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : filteredLeads.length === 0 ? (
+              <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+            ) : filtered.length === 0 ? (
               <div className="flex h-64 flex-col items-center justify-center text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                  <Users className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <p className="text-lg font-medium text-foreground">No leads found</p>
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted"><Users className="h-8 w-8 text-muted-foreground" /></div>
+                <p className="text-lg font-medium text-foreground">No contacts found</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {leads.length === 0 
-                    ? 'Use FullEnrich on opportunities to discover buyer contacts'
-                    : 'Try adjusting your filters'}
+                  {leads.length === 0 ? 'Use "Find Buyers" on an opportunity to get started' : 'Try adjusting your filters'}
                 </p>
-                {leads.length === 0 && (
-                  <Button asChild className="mt-4">
-                    <Link to="/opportunities">View Opportunities</Link>
-                  </Button>
-                )}
+                {leads.length === 0 && <Button asChild className="mt-4"><Link to="/opportunities">View Opportunities</Link></Button>}
               </div>
             ) : (
               <div className="rounded-md border">
@@ -295,60 +174,35 @@ export default function LeadsPage() {
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Opportunity</TableHead>
-                      <TableHead>Export Status</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Added</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredLeads.map((lead) => (
+                    {filtered.map(lead => (
                       <TableRow key={lead.id}>
                         <TableCell className="font-medium">{lead.name}</TableCell>
                         <TableCell>{lead.company || '-'}</TableCell>
                         <TableCell>{lead.role || '-'}</TableCell>
                         <TableCell>
-                          {lead.email ? (
-                            <a href={`mailto:${lead.email}`} className="text-primary hover:underline">
-                              {lead.email}
-                            </a>
-                          ) : (
-                            '-'
-                          )}
+                          {lead.email ? <a href={`mailto:${lead.email}`} className="text-primary hover:underline">{lead.email}</a> : '-'}
                         </TableCell>
                         <TableCell>{lead.phone || '-'}</TableCell>
                         <TableCell>
                           {lead.opportunities?.signals ? (
-                            <Link 
-                              to={`/opportunity/${lead.opportunity_id}`}
-                              className="flex items-center gap-1 text-sm text-primary hover:underline"
-                            >
+                            <Link to={`/opportunity/${lead.opportunity_id}`} className="flex items-center gap-1 text-sm text-primary hover:underline">
                               <span className="capitalize">{lead.opportunities.signals.produce_type}</span>
                               <span className="text-muted-foreground">({lead.opportunities.signals.district})</span>
                             </Link>
-                          ) : (
-                            '-'
-                          )}
+                          ) : '-'}
                         </TableCell>
-                        <TableCell>
-                          {getExportStatusBadge(lead.export_status)}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(lead.created_at), 'MMM d')}
-                        </TableCell>
+                        <TableCell>{getExportBadge(lead.export_status)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{format(new Date(lead.created_at), 'MMM d')}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {lead.linkedin_url && (
-                              <Button variant="ghost" size="sm" asChild>
-                                <a href={lead.linkedin_url} target="_blank" rel="noopener noreferrer">
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
-                              </Button>
-                            )}
-                            <Button variant="ghost" size="sm" asChild>
-                              <Link to={`/opportunity/${lead.opportunity_id}`}>
-                                <Eye className="h-4 w-4" />
-                              </Link>
-                            </Button>
+                            {lead.linkedin_url && <Button variant="ghost" size="sm" asChild><a href={lead.linkedin_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>}
+                            <Button variant="ghost" size="sm" asChild><Link to={`/opportunity/${lead.opportunity_id}`}><Eye className="h-4 w-4" /></Link></Button>
                           </div>
                         </TableCell>
                       </TableRow>

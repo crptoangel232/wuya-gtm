@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_plan_items: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          is_completed: boolean
+          opportunity_id: string
+          sort_order: number
+          task_text: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          opportunity_id: string
+          sort_order?: number
+          task_text: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          opportunity_id?: string
+          sort_order?: number
+          task_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_plan_items_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       buyer_leads: {
         Row: {
           company: string | null
@@ -119,35 +157,79 @@ export type Database = {
       }
       opportunities: {
         Row: {
+          buyer_keywords: string | null
+          buyer_type: string | null
           created_at: string
           id: string
           recommended_action: string | null
           score: number
           signal_id: string
           status: string
+          target_city: string | null
           urgency_label: string
         }
         Insert: {
+          buyer_keywords?: string | null
+          buyer_type?: string | null
           created_at?: string
           id?: string
           recommended_action?: string | null
           score?: number
           signal_id: string
           status?: string
+          target_city?: string | null
           urgency_label?: string
         }
         Update: {
+          buyer_keywords?: string | null
+          buyer_type?: string | null
           created_at?: string
           id?: string
           recommended_action?: string | null
           score?: number
           signal_id?: string
           status?: string
+          target_city?: string | null
           urgency_label?: string
         }
         Relationships: [
           {
             foreignKeyName: "opportunities_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signal_images: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          id: string
+          signal_id: string
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          id?: string
+          signal_id: string
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          signal_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_images_signal_id_fkey"
             columns: ["signal_id"]
             isOneToOne: false
             referencedRelation: "signals"
