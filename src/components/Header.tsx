@@ -23,7 +23,7 @@ export function Header() {
           <Button variant="ghost" asChild>
             <Link to="/leads" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
-              Leads
+              Buyer Contacts
             </Link>
           </Button>
           <Button asChild>

@@ -18,13 +18,8 @@ import { Eye, RefreshCw, Loader2, Bell, HelpCircle, Package, Users, Zap } from '
 import { format } from 'date-fns';
 
 const PRODUCE_ICONS: Record<string, string> = {
-  tomato: '🍅',
-  onion: '🧅',
-  rice: '🌾',
-  cassava: '🥔',
-  pepper: '🌶️',
-  potato: '🥔',
-  okra: '🥒',
+  tomato: '🍅', onion: '🧅', rice: '🌾', cassava: '🥔',
+  pepper: '🌶️', potato: '🥔', okra: '🥒',
 };
 
 interface OpportunityWithSignal {
@@ -34,13 +29,7 @@ interface OpportunityWithSignal {
   recommended_action: string;
   status: string;
   created_at: string;
-  signals: {
-    produce_type: string;
-    quantity: number;
-    unit: string;
-    district: string;
-  } | null;
-  lead_count?: number;
+  signals: { produce_type: string; quantity: number; unit: string; district: string } | null;
 }
 
 export default function Dashboard() {
@@ -50,7 +39,6 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
 
-  // Filters
   const [produceFilter, setProduceFilter] = useState<string>('all');
   const [districtFilter, setDistrictFilter] = useState<string>('all');
   const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
@@ -61,48 +49,27 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('opportunities')
-        .select(`
-          id,
-          score,
-          urgency_label,
-          recommended_action,
-          status,
-          created_at,
-          signals (
-            produce_type,
-            quantity,
-            unit,
-            district
-          )
-        `)
+        .select('id, score, urgency_label, recommended_action, status, created_at, signals (produce_type, quantity, unit, district)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setOpportunities(data || []);
 
-      // Fetch lead counts for all opportunities
       if (data && data.length > 0) {
-        const opportunityIds = data.map(o => o.id);
         const { data: leadsData, error: leadsError } = await supabase
           .from('buyer_leads')
           .select('opportunity_id')
-          .in('opportunity_id', opportunityIds);
+          .in('opportunity_id', data.map(o => o.id));
 
         if (!leadsError && leadsData) {
           const counts: Record<string, number> = {};
-          leadsData.forEach(lead => {
-            counts[lead.opportunity_id] = (counts[lead.opportunity_id] || 0) + 1;
-          });
+          leadsData.forEach(lead => { counts[lead.opportunity_id] = (counts[lead.opportunity_id] || 0) + 1; });
           setLeadCounts(counts);
         }
       }
     } catch (error) {
-      console.error('Error fetching opportunities:', error);
-      toast({
-        title: 'Error loading data',
-        description: 'Could not load opportunities.',
-        variant: 'destructive',
-      });
+      console.error('Error fetching:', error);
+      toast({ title: 'Could not load opportunities', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -110,89 +77,33 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchOpportunities();
-
-    // Set up realtime subscription for opportunities
-    const opportunitiesChannel = supabase
-      .channel('opportunities-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'opportunities',
-        },
-        (payload) => {
-          console.log('Opportunity change:', payload);
-          // Refetch to get updated data with joins
-          fetchOpportunities();
-        }
-      )
-      .subscribe();
-
-    // Set up realtime subscription for buyer_leads
-    const leadsChannel = supabase
-      .channel('leads-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'buyer_leads',
-        },
-        (payload) => {
-          console.log('New lead added:', payload);
-          // Update lead count for this opportunity
-          const newLead = payload.new as { opportunity_id: string };
-          setLeadCounts(prev => ({
-            ...prev,
-            [newLead.opportunity_id]: (prev[newLead.opportunity_id] || 0) + 1,
-          }));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(opportunitiesChannel);
-      supabase.removeChannel(leadsChannel);
-    };
+    const ch1 = supabase.channel('opp-rt').on('postgres_changes', { event: '*', schema: 'public', table: 'opportunities' }, () => fetchOpportunities()).subscribe();
+    const ch2 = supabase.channel('leads-rt').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'buyer_leads' }, (payload) => {
+      const nl = payload.new as { opportunity_id: string };
+      setLeadCounts(prev => ({ ...prev, [nl.opportunity_id]: (prev[nl.opportunity_id] || 0) + 1 }));
+    }).subscribe();
+    return () => { supabase.removeChannel(ch1); supabase.removeChannel(ch2); };
   }, []);
 
-  const updateStatus = async (opportunityId: string, newStatus: OpportunityStatus) => {
-    setIsUpdating(opportunityId);
+  const updateStatus = async (id: string, newStatus: OpportunityStatus) => {
+    setIsUpdating(id);
     try {
-      const { error } = await supabase
-        .from('opportunities')
-        .update({ status: newStatus })
-        .eq('id', opportunityId);
-
+      const { error } = await supabase.from('opportunities').update({ status: newStatus }).eq('id', id);
       if (error) throw error;
-
-      setOpportunities((prev) =>
-        prev.map((opp) =>
-          opp.id === opportunityId ? { ...opp, status: newStatus } : opp
-        )
-      );
-
-      toast({
-        title: 'Status updated',
-        description: `Changed to ${newStatus}`,
-      });
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast({
-        title: 'Update failed',
-        variant: 'destructive',
-      });
+      setOpportunities(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+      toast({ title: 'Status updated' });
+    } catch {
+      toast({ title: 'Update failed', variant: 'destructive' });
     } finally {
       setIsUpdating(null);
     }
   };
 
-  const filteredOpportunities = opportunities.filter((opp) => {
-    if (produceFilter !== 'all' && opp.signals?.produce_type !== produceFilter) return false;
-    if (districtFilter !== 'all' && opp.signals?.district !== districtFilter) return false;
-    if (urgencyFilter !== 'all' && opp.urgency_label !== urgencyFilter) return false;
-    if (statusFilter !== 'all' && opp.status !== statusFilter) return false;
+  const filtered = opportunities.filter((o) => {
+    if (produceFilter !== 'all' && o.signals?.produce_type !== produceFilter) return false;
+    if (districtFilter !== 'all' && o.signals?.district !== districtFilter) return false;
+    if (urgencyFilter !== 'all' && o.urgency_label !== urgencyFilter) return false;
+    if (statusFilter !== 'all' && o.status !== statusFilter) return false;
     return true;
   });
 
@@ -200,17 +111,15 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8">
-        {/* Page Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-3xl font-bold text-foreground">Opportunities Dashboard</h1>
+            <h1 className="text-3xl font-bold text-foreground">Opportunities</h1>
             <Badge variant="outline" className="flex items-center gap-1 text-xs">
-              <Zap className="h-3 w-3" />
-              Live
+              <Zap className="h-3 w-3" />Live
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            Browse produce available for purchase — prioritized by urgency
+            See what produce needs urgent action — sorted by how quickly it needs to sell
           </p>
         </div>
 
@@ -219,100 +128,55 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2 text-xl">
-                  <Package className="h-5 w-5" />
-                  Available Opportunities
+                  <Package className="h-5 w-5" />Available Produce
                 </CardTitle>
-                <CardDescription>
-                  {filteredOpportunities.length} {filteredOpportunities.length === 1 ? 'opportunity' : 'opportunities'} found
-                </CardDescription>
+                <CardDescription>{filtered.length} {filtered.length === 1 ? 'opportunity' : 'opportunities'} found</CardDescription>
               </div>
               <Button variant="outline" size="sm" onClick={fetchOpportunities}>
-                <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh
+                <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />Refresh
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {/* Filters */}
             <div className="mb-6 grid gap-4 md:grid-cols-4">
               <Select value={produceFilter} onValueChange={setProduceFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by produce" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="All Produce" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Produce</SelectItem>
-                  {PRODUCE_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      <span className="mr-2">{PRODUCE_ICONS[type] || '🥬'}</span>
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </SelectItem>
-                  ))}
+                  {PRODUCE_TYPES.map(t => <SelectItem key={t} value={t}><span className="mr-2">{PRODUCE_ICONS[t] || '🥬'}</span>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
                 </SelectContent>
               </Select>
-
               <Select value={districtFilter} onValueChange={setDistrictFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by district" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="All Districts" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Districts</SelectItem>
-                  {DISTRICTS.map((district) => (
-                    <SelectItem key={district} value={district}>
-                      {district}
-                    </SelectItem>
-                  ))}
+                  {DISTRICTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
-
               <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by urgency" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="All Urgency" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Urgency Levels</SelectItem>
-                  {URGENCY_LABELS.map((label) => (
-                    <SelectItem key={label} value={label}>
-                      {label} Urgency
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">All Urgency</SelectItem>
+                  {URGENCY_LABELS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                 </SelectContent>
               </Select>
-
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="All Status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  {OPPORTUNITY_STATUS.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
+                  {OPPORTUNITY_STATUS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Table */}
             {isLoading ? (
-              <div className="flex h-64 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : filteredOpportunities.length === 0 ? (
+              <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+            ) : filtered.length === 0 ? (
               <div className="flex h-64 flex-col items-center justify-center text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                  <Package className="h-8 w-8 text-muted-foreground" />
-                </div>
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted"><Package className="h-8 w-8 text-muted-foreground" /></div>
                 <p className="text-lg font-medium text-foreground">No opportunities yet</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  When sellers report produce, opportunities will appear here
-                </p>
-                <Button asChild className="mt-4">
-                  <Link to="/report">
-                    <Bell className="mr-2 h-4 w-4" />
-                    Report a Spoilage Alert
-                  </Link>
-                </Button>
+                <p className="mt-1 text-sm text-muted-foreground">When someone reports produce, it will appear here</p>
+                <Button asChild className="mt-4"><Link to="/report"><Bell className="mr-2 h-4 w-4" />Report a Spoilage Alert</Link></Button>
               </div>
             ) : (
               <div className="rounded-md border">
@@ -324,25 +188,14 @@ export default function Dashboard() {
                       <TableHead>Quantity</TableHead>
                       <TableHead className="text-center">
                         <div className="flex items-center justify-center gap-1">
-                          Urgency Score
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs text-sm">
-                                Higher = more urgent to sell. Based on spoilage deadline, quantity, and price drop.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
+                          Score
+                          <Tooltip><TooltipTrigger asChild><HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" /></TooltipTrigger>
+                            <TooltipContent><p className="max-w-xs text-sm">Higher = more urgent to sell</p></TooltipContent></Tooltip>
                         </div>
                       </TableHead>
-                      <TableHead>Spoilage Risk</TableHead>
+                      <TableHead>Urgency</TableHead>
                       <TableHead className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Users className="h-3.5 w-3.5" />
-                          Leads
-                        </div>
+                        <div className="flex items-center justify-center gap-1"><Users className="h-3.5 w-3.5" />Contacts</div>
                       </TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Reported</TableHead>
@@ -350,59 +203,31 @@ export default function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredOpportunities.map((opp) => (
-                      <TableRow key={opp.id}>
+                    {filtered.map((o) => (
+                      <TableRow key={o.id}>
                         <TableCell className="font-medium">
-                          <span className="mr-2">{PRODUCE_ICONS[opp.signals?.produce_type || ''] || '🥬'}</span>
-                          <span className="capitalize">{opp.signals?.produce_type}</span>
+                          <span className="mr-2">{PRODUCE_ICONS[o.signals?.produce_type || ''] || '🥬'}</span>
+                          <span className="capitalize">{o.signals?.produce_type}</span>
                         </TableCell>
-                        <TableCell>{opp.signals?.district}</TableCell>
-                        <TableCell>
-                          {opp.signals?.quantity} {opp.signals?.unit}
-                        </TableCell>
+                        <TableCell>{o.signals?.district}</TableCell>
+                        <TableCell>{o.signals?.quantity} {o.signals?.unit}</TableCell>
+                        <TableCell className="text-center"><ScoreDisplay score={o.score} size="sm" /></TableCell>
+                        <TableCell><UrgencyBadge urgency={o.urgency_label as UrgencyLabel} /></TableCell>
                         <TableCell className="text-center">
-                          <ScoreDisplay score={opp.score} size="sm" />
+                          {leadCounts[o.id] ? (
+                            <Badge variant="secondary" className="gap-1"><Users className="h-3 w-3" />{leadCounts[o.id]}</Badge>
+                          ) : <span className="text-muted-foreground text-sm">—</span>}
                         </TableCell>
                         <TableCell>
-                          <UrgencyBadge urgency={opp.urgency_label as UrgencyLabel} />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {leadCounts[opp.id] ? (
-                            <Badge variant="secondary" className="gap-1">
-                              <Users className="h-3 w-3" />
-                              {leadCounts[opp.id]}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={opp.status}
-                            onValueChange={(value) => updateStatus(opp.id, value as OpportunityStatus)}
-                            disabled={isUpdating === opp.id}
-                          >
-                            <SelectTrigger className="h-8 w-28">
-                              <StatusBadge status={opp.status as OpportunityStatus} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {OPPORTUNITY_STATUS.map((status) => (
-                                <SelectItem key={status} value={status}>
-                                  {status}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
+                          <Select value={o.status} onValueChange={(v) => updateStatus(o.id, v as OpportunityStatus)} disabled={isUpdating === o.id}>
+                            <SelectTrigger className="h-8 w-28"><StatusBadge status={o.status as OpportunityStatus} /></SelectTrigger>
+                            <SelectContent>{OPPORTUNITY_STATUS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(opp.created_at), 'MMM d, yyyy')}
-                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{format(new Date(o.created_at), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="sm" asChild>
-                            <Link to={`/opportunity/${opp.id}`}>
-                              <Eye className="mr-1 h-4 w-4" />
-                              View
-                            </Link>
+                            <Link to={`/opportunity/${o.id}`}><Eye className="mr-1 h-4 w-4" />View</Link>
                           </Button>
                         </TableCell>
                       </TableRow>
