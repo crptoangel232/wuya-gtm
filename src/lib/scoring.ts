@@ -1,22 +1,14 @@
 import type { PriceDropSeverity, UrgencyLabel } from './constants';
 
-// Districts far from Freetown (Western Area)
-const REMOTE_DISTRICTS = [
-  'Kailahun',
-  'Kono',
-  'Falaba',
-  'Karene',
-  'Pujehun',
-  'Bonthe',
-];
-
 interface SignalData {
   harvestDeadlineDays: number;
   quantity: number;
   unit: string;
   priceDropSeverity: PriceDropSeverity;
-  district: string;
   produceType: string;
+  country?: string;
+  region?: string;
+  city?: string;
 }
 
 export function calculateScore(signal: SignalData): number {
@@ -46,11 +38,6 @@ export function calculateScore(signal: SignalData): number {
     score += 12;
   }
 
-  // Location scoring
-  if (REMOTE_DISTRICTS.includes(signal.district)) {
-    score += 10;
-  }
-
   return Math.min(score, 100);
 }
 
@@ -60,29 +47,36 @@ export function getUrgencyLabel(score: number): UrgencyLabel {
   return 'Low';
 }
 
+export function getLocationString(signal: { country?: string; region?: string; city?: string; district?: string }): string {
+  const parts: string[] = [];
+  if (signal.city) parts.push(signal.city);
+  if (signal.region) parts.push(signal.region);
+  if (signal.country) parts.push(signal.country);
+  // Fallback to district for legacy data
+  if (parts.length === 0 && signal.district) parts.push(signal.district);
+  return parts.join(', ') || 'Unknown location';
+}
+
 export function getRecommendedAction(
   score: number,
   produceType: string,
-  district: string,
+  location: string,
   priceDropSeverity: PriceDropSeverity
 ): string {
   const urgency = getUrgencyLabel(score);
 
   if (urgency === 'High') {
     if (priceDropSeverity === 'high') {
-      return `URGENT: Call ${district} wholesalers + supermarkets today for ${produceType}`;
+      return `URGENT: Call ${location} wholesalers + supermarkets today for ${produceType}`;
     }
     return `Priority: Send bulk offer to exporters and restaurant chains for ${produceType}`;
   }
 
   if (urgency === 'Medium') {
-    if (REMOTE_DISTRICTS.includes(district)) {
-      return `Route ${produceType} to NGO food programs in ${district} area`;
-    }
-    return `Target local restaurant bulk buyers for ${produceType} in ${district}`;
+    return `Target local restaurant bulk buyers for ${produceType} in ${location}`;
   }
 
-  return `Monitor ${produceType} pricing in ${district} - schedule follow-up in 2-3 days`;
+  return `Monitor ${produceType} pricing in ${location} - schedule follow-up in 2-3 days`;
 }
 
 function normalizeToKg(quantity: number, unit: string): number {
@@ -90,9 +84,9 @@ function normalizeToKg(quantity: number, unit: string): number {
     case 'tons':
       return quantity * 1000;
     case 'bags':
-      return quantity * 50; // Assume 50kg bags
+      return quantity * 50;
     case 'crates':
-      return quantity * 20; // Assume 20kg crates
+      return quantity * 20;
     default:
       return quantity;
   }
@@ -105,65 +99,25 @@ export function getScoreBreakdown(signal: SignalData): {
 }[] {
   const breakdown: { category: string; points: number; reason: string }[] = [];
 
-  // Harvest deadline
   if (signal.harvestDeadlineDays <= 2) {
-    breakdown.push({
-      category: 'Harvest Deadline',
-      points: 40,
-      reason: 'Critical: ≤2 days until spoilage',
-    });
+    breakdown.push({ category: 'Harvest Deadline', points: 40, reason: 'Critical: ≤2 days until spoilage' });
   } else if (signal.harvestDeadlineDays <= 5) {
-    breakdown.push({
-      category: 'Harvest Deadline',
-      points: 25,
-      reason: 'Urgent: ≤5 days until spoilage',
-    });
+    breakdown.push({ category: 'Harvest Deadline', points: 25, reason: 'Urgent: ≤5 days until spoilage' });
   } else if (signal.harvestDeadlineDays <= 7) {
-    breakdown.push({
-      category: 'Harvest Deadline',
-      points: 10,
-      reason: 'Moderate: ≤7 days until spoilage',
-    });
+    breakdown.push({ category: 'Harvest Deadline', points: 10, reason: 'Moderate: ≤7 days until spoilage' });
   }
 
-  // Quantity
   const quantityInKg = normalizeToKg(signal.quantity, signal.unit);
   if (quantityInKg >= 5000) {
-    breakdown.push({
-      category: 'Quantity',
-      points: 15,
-      reason: 'Large volume: 5+ tons',
-    });
+    breakdown.push({ category: 'Quantity', points: 15, reason: 'Large volume: 5+ tons' });
   } else if (quantityInKg >= 1000) {
-    breakdown.push({
-      category: 'Quantity',
-      points: 8,
-      reason: 'Medium volume: 1+ tons',
-    });
+    breakdown.push({ category: 'Quantity', points: 8, reason: 'Medium volume: 1+ tons' });
   }
 
-  // Price drop
   if (signal.priceDropSeverity === 'high') {
-    breakdown.push({
-      category: 'Price Drop',
-      points: 25,
-      reason: 'High price drop severity',
-    });
+    breakdown.push({ category: 'Price Drop', points: 25, reason: 'High price drop severity' });
   } else if (signal.priceDropSeverity === 'medium') {
-    breakdown.push({
-      category: 'Price Drop',
-      points: 12,
-      reason: 'Medium price drop severity',
-    });
-  }
-
-  // Location
-  if (REMOTE_DISTRICTS.includes(signal.district)) {
-    breakdown.push({
-      category: 'Location',
-      points: 10,
-      reason: `Remote district: ${signal.district}`,
-    });
+    breakdown.push({ category: 'Price Drop', points: 12, reason: 'Medium price drop severity' });
   }
 
   return breakdown;

@@ -16,20 +16,20 @@ interface ActionItem {
 interface ActionPlanProps {
   opportunityId: string;
   produceType: string;
-  district: string;
+  location: string;
   quantity: number;
   unit: string;
   deadlineDays: number;
 }
 
 function generateDefaultTasks(props: ActionPlanProps): string[] {
-  const { produceType, district, quantity, unit, deadlineDays } = props;
+  const { produceType, location, quantity, unit, deadlineDays } = props;
   const tasks: string[] = [];
 
   if (deadlineDays <= 2) {
-    tasks.push(`Call top 3 ${district} buyers within 2 hours`);
+    tasks.push(`Call top 3 ${location} buyers within 2 hours`);
   } else {
-    tasks.push(`Call top 3 ${district} buyers today`);
+    tasks.push(`Call top 3 ${location} buyers today`);
   }
 
   tasks.push(`Send WhatsApp message to buyer contacts about ${quantity} ${unit} of ${produceType}`);
@@ -62,7 +62,6 @@ export function ActionPlan(props: ActionPlanProps) {
     if (data && data.length > 0) {
       setItems(data);
     } else {
-      // Generate default tasks
       const defaultTasks = generateDefaultTasks(props);
       const inserts = defaultTasks.map((text, i) => ({
         opportunity_id: opportunityId,
@@ -92,9 +91,7 @@ export function ActionPlan(props: ActionPlanProps) {
     
     setItems(prev =>
       prev.map(item =>
-        item.id === itemId
-          ? { ...item, is_completed: newState }
-          : item
+        item.id === itemId ? { ...item, is_completed: newState } : item
       )
     );
 
@@ -107,12 +104,9 @@ export function ActionPlan(props: ActionPlanProps) {
       .eq('id', itemId);
 
     if (error) {
-      // Revert on error
       setItems(prev =>
         prev.map(item =>
-          item.id === itemId
-            ? { ...item, is_completed: currentState }
-            : item
+          item.id === itemId ? { ...item, is_completed: currentState } : item
         )
       );
       toast({ title: 'Could not update task', variant: 'destructive' });
@@ -163,9 +157,7 @@ export function ActionPlan(props: ActionPlanProps) {
               />
               <span
                 className={`text-sm ${
-                  item.is_completed
-                    ? 'text-muted-foreground line-through'
-                    : 'text-foreground'
+                  item.is_completed ? 'text-muted-foreground line-through' : 'text-foreground'
                 }`}
               >
                 {item.task_text}

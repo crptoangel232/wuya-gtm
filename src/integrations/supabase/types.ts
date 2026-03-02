@@ -239,6 +239,8 @@ export type Database = {
       }
       signals: {
         Row: {
+          city: string | null
+          country: string
           created_at: string
           district: string
           harvest_deadline_days: number
@@ -247,9 +249,12 @@ export type Database = {
           price_drop_severity: string
           produce_type: string
           quantity: number
+          region: string | null
           unit: string
         }
         Insert: {
+          city?: string | null
+          country?: string
           created_at?: string
           district: string
           harvest_deadline_days: number
@@ -258,9 +263,12 @@ export type Database = {
           price_drop_severity: string
           produce_type: string
           quantity: number
+          region?: string | null
           unit?: string
         }
         Update: {
+          city?: string | null
+          country?: string
           created_at?: string
           district?: string
           harvest_deadline_days?: number
@@ -269,6 +277,7 @@ export type Database = {
           price_drop_severity?: string
           produce_type?: string
           quantity?: number
+          region?: string | null
           unit?: string
         }
         Relationships: []

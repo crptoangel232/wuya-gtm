@@ -1,7 +1,7 @@
 interface OpportunityExport {
   id: string;
   produceType: string;
-  district: string;
+  location: string;
   quantity: number;
   unit: string;
   score: number;
@@ -27,61 +27,28 @@ interface BuyerLeadExport {
 
 export function exportOpportunityToCsv(opportunity: OpportunityExport): string {
   const headers = [
-    'ID',
-    'Produce Type',
-    'District',
-    'Quantity',
-    'Unit',
-    'Score',
-    'Urgency',
-    'Recommended Action',
-    'Status',
-    'Harvest Deadline (Days)',
-    'Price Drop Severity',
-    'Notes',
-    'Created At',
+    'ID', 'Produce Type', 'Location', 'Quantity', 'Unit', 'Score', 'Urgency',
+    'Recommended Action', 'Status', 'Harvest Deadline (Days)', 'Price Drop Severity',
+    'Notes', 'Created At',
   ];
 
   const row = [
-    opportunity.id,
-    opportunity.produceType,
-    opportunity.district,
-    opportunity.quantity.toString(),
-    opportunity.unit,
-    opportunity.score.toString(),
-    opportunity.urgencyLabel,
-    `"${opportunity.recommendedAction}"`,
-    opportunity.status,
-    opportunity.harvestDeadlineDays.toString(),
-    opportunity.priceDropSeverity,
-    opportunity.notes ? `"${opportunity.notes}"` : '',
-    opportunity.createdAt,
+    opportunity.id, opportunity.produceType, opportunity.location,
+    opportunity.quantity.toString(), opportunity.unit, opportunity.score.toString(),
+    opportunity.urgencyLabel, `"${opportunity.recommendedAction}"`, opportunity.status,
+    opportunity.harvestDeadlineDays.toString(), opportunity.priceDropSeverity,
+    opportunity.notes ? `"${opportunity.notes}"` : '', opportunity.createdAt,
   ];
 
   return `${headers.join(',')}\n${row.join(',')}`;
 }
 
 export function exportLeadsToCsv(leads: BuyerLeadExport[]): string {
-  const headers = [
-    'Name',
-    'Company',
-    'Role',
-    'Email',
-    'Phone',
-    'LinkedIn URL',
-    'Location',
-    'Source',
-  ];
+  const headers = ['Name', 'Company', 'Role', 'Email', 'Phone', 'LinkedIn URL', 'Location', 'Source'];
 
   const rows = leads.map((lead) => [
-    lead.name,
-    lead.company || '',
-    lead.role || '',
-    lead.email || '',
-    lead.phone || '',
-    lead.linkedinUrl || '',
-    lead.location || '',
-    lead.source || '',
+    lead.name, lead.company || '', lead.role || '', lead.email || '',
+    lead.phone || '', lead.linkedinUrl || '', lead.location || '', lead.source || '',
   ]);
 
   return `${headers.join(',')}\n${rows.map((r) => r.join(',')).join('\n')}`;
