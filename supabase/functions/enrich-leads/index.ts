@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 function isValidUUID(str: string): boolean {
@@ -16,6 +16,10 @@ function sanitizeString(str: unknown, maxLength: number): string | null {
   if (str === null || str === undefined) return null;
   if (typeof str !== "string") return null;
   return str.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, maxLength);
+}
+
+function buildStringFilter(value: string, exactMatch = false) {
+  return [{ value, exact_match: exactMatch, exclude: false }];
 }
 
 Deno.serve(async (req) => {
@@ -81,9 +85,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get FullEnrich API key
     const fullEnrichApiKey = Deno.env.get("FULLENRICH_API_KEY");
-
     if (!fullEnrichApiKey) {
       return new Response(
         JSON.stringify({ 
@@ -94,36 +96,64 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build FullEnrich search query with buyer targeting
-    const queryParts = [
-      sanitizedProduceType || "produce",
-      sanitizedBuyerType || "buyer",
-      sanitizedTargetCity || sanitizedDistrict || "Sierra Leone",
-    ];
-    if (sanitizedKeywords) queryParts.push(sanitizedKeywords);
-    const searchQuery = queryParts.join(" ");
+    // Build FullEnrich /people/search request body per API docs
+    const searchBody: Record<string, unknown> = {
+      limit: 10,
+      offset: 0,
+    };
 
-    // Build location filter
-    const locations = ["Sierra Leone"];
-    if (sanitizedTargetCity) locations.unshift(sanitizedTargetCity);
-
-    // Build industry filter based on buyer type
-    const industries = ["agriculture", "food & beverages"];
+    // Industry filter based on buyer type
+    const industryValues: string[] = [];
     if (sanitizedBuyerType) {
       const typeMap: Record<string, string[]> = {
-        "Distributor": ["wholesale", "distribution"],
-        "Restaurant": ["restaurants", "hospitality"],
-        "Supermarket": ["retail", "grocery"],
-        "Exporter": ["import & export", "international trade"],
-        "NGO Procurement": ["non-profit", "humanitarian"],
-        "Aggregator": ["wholesale", "logistics"],
+        "Distributor": ["Wholesale", "Food and Beverage Services"],
+        "Restaurant": ["Restaurants", "Hospitality"],
+        "Supermarket": ["Retail", "Retail Groceries"],
+        "Exporter": ["International Trade and Development", "Import and Export"],
+        "NGO Procurement": ["Non-profit Organizations"],
+        "Aggregator": ["Wholesale", "Farming"],
       };
       if (typeMap[sanitizedBuyerType]) {
-        industries.push(...typeMap[sanitizedBuyerType]);
+        industryValues.push(...typeMap[sanitizedBuyerType]);
       }
     }
+    if (industryValues.length === 0) {
+      industryValues.push("Food and Beverage Services", "Farming");
+    }
+    searchBody.current_company_industries = industryValues.map(v => ({
+      value: v, exact_match: false, exclude: false,
+    }));
 
-    console.log("FullEnrich search:", { searchQuery, industries, locations });
+    // Location filter
+    const locationFilters: Array<{value: string; exact_match: boolean; exclude: boolean}> = [];
+    if (sanitizedTargetCity) {
+      locationFilters.push({ value: sanitizedTargetCity, exact_match: false, exclude: false });
+    }
+    if (sanitizedDistrict && sanitizedDistrict !== sanitizedTargetCity) {
+      locationFilters.push({ value: sanitizedDistrict, exact_match: false, exclude: false });
+    }
+    if (locationFilters.length > 0) {
+      searchBody.person_locations = locationFilters;
+    }
+
+    // Title filter from keywords or produce type
+    const titleFilters: Array<{value: string; exact_match: boolean; exclude: boolean}> = [];
+    if (sanitizedKeywords) {
+      titleFilters.push({ value: sanitizedKeywords, exact_match: false, exclude: false });
+    }
+    if (sanitizedBuyerType) {
+      titleFilters.push({ value: sanitizedBuyerType, exact_match: false, exclude: false });
+    }
+    if (titleFilters.length > 0) {
+      searchBody.current_position_titles = titleFilters;
+    }
+
+    // Company specialties from produce type
+    if (sanitizedProduceType) {
+      searchBody.current_company_specialties = buildStringFilter(sanitizedProduceType);
+    }
+
+    console.log("FullEnrich /people/search request:", JSON.stringify(searchBody));
 
     interface EnrichedLead {
       name: string;
@@ -145,46 +175,48 @@ Deno.serve(async (req) => {
           "Authorization": `Bearer ${fullEnrichApiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          query: searchQuery,
-          filters: {
-            industries,
-            locations,
-          },
-          limit: 10,
-        }),
+        body: JSON.stringify(searchBody),
       });
 
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.log("FullEnrich API error:", response.status, errorBody);
+
         const statusText = response.status === 403 
           ? "Invalid API key or insufficient permissions"
           : response.status === 429
           ? "Rate limit exceeded — wait a few minutes and try again"
-          : `FullEnrich returned error ${response.status}`;
+          : `FullEnrich returned error ${response.status}: ${errorBody}`;
 
-        console.log("FullEnrich API error:", response.status);
         return new Response(
-          JSON.stringify({ 
-            error: "FullEnrich search failed",
-            message: statusText
-          }),
+          JSON.stringify({ error: "FullEnrich search failed", message: statusText }),
           { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       const data = await response.json();
-      
-      if (data.results && data.results.length > 0) {
-        enrichedLeads = data.results.map((result: Record<string, unknown>) => ({
-          name: result.full_name || result.name || "Unknown",
-          company: result.company || result.organization || null,
-          role: result.title || result.job_title || null,
-          email: result.email || null,
-          phone: result.phone || result.mobile || null,
-          linkedin_url: result.linkedin_url || result.linkedin || null,
-          location: result.location || result.city || null,
-          source: "FullEnrich",
-        }));
+      console.log("FullEnrich response metadata:", JSON.stringify(data.metadata));
+
+      if (data.people && data.people.length > 0) {
+        enrichedLeads = data.people.map((person: Record<string, unknown>) => {
+          const employment = person.employment as Record<string, unknown> | null;
+          const current = employment?.current as Record<string, unknown> | null;
+          const company = current?.company as Record<string, unknown> | null;
+          const socialProfiles = person.social_profiles as Record<string, unknown> | null;
+          const linkedin = socialProfiles?.linkedin as Record<string, unknown> | null;
+          const loc = person.location as Record<string, unknown> | null;
+
+          return {
+            name: person.full_name || "Unknown",
+            company: company?.name || null,
+            role: current?.title || null,
+            email: null, // People search doesn't return contact info directly
+            phone: null,
+            linkedin_url: linkedin?.url || null,
+            location: loc ? [loc.city, loc.region, loc.country].filter(Boolean).join(", ") : null,
+            source: "FullEnrich",
+          };
+        });
       } else {
         return new Response(
           JSON.stringify({ 
@@ -209,13 +241,18 @@ Deno.serve(async (req) => {
     // Check for existing leads to avoid duplicates
     const { data: existingLeads } = await supabase
       .from("buyer_leads")
-      .select("email")
+      .select("linkedin_url, name")
       .eq("opportunity_id", opportunityId);
 
-    const existingEmails = new Set(existingLeads?.map((l) => l.email) || []);
+    const existingLinkedins = new Set(existingLeads?.map((l) => l.linkedin_url).filter(Boolean) || []);
+    const existingNames = new Set(existingLeads?.map((l) => l.name) || []);
 
     const newLeads = enrichedLeads.filter(
-      (lead) => !lead.email || !existingEmails.has(lead.email)
+      (lead) => {
+        if (lead.linkedin_url && existingLinkedins.has(lead.linkedin_url)) return false;
+        if (existingNames.has(lead.name)) return false;
+        return true;
+      }
     );
 
     if (newLeads.length > 0) {
