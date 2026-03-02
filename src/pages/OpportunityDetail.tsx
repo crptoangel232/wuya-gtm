@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { getScoreBreakdown } from '@/lib/scoring';
+import { getScoreBreakdown, getLocationString } from '@/lib/scoring';
 import { exportOpportunityToCsv, exportLeadsToCsv, downloadCsv } from '@/lib/csv-export';
 import { OPPORTUNITY_STATUS } from '@/lib/constants';
 import type { OpportunityStatus, UrgencyLabel, PriceDropSeverity } from '@/lib/constants';
@@ -267,7 +267,8 @@ export default function OpportunityDetail() {
   const handleExportOpportunity = () => {
     if (!opportunity) return;
     const csv = exportOpportunityToCsv({
-      id: opportunity.id, produceType: opportunity.signals.produce_type, district: opportunity.signals.district,
+      id: opportunity.id, produceType: opportunity.signals.produce_type,
+      location: getLocationString(opportunity.signals),
       quantity: opportunity.signals.quantity, unit: opportunity.signals.unit, score: opportunity.score,
       urgencyLabel: opportunity.urgency_label, recommendedAction: opportunity.recommended_action,
       status: opportunity.status, harvestDeadlineDays: opportunity.signals.harvest_deadline_days,
@@ -330,7 +331,7 @@ export default function OpportunityDetail() {
     harvestDeadlineDays: opportunity.signals.harvest_deadline_days,
     quantity: opportunity.signals.quantity, unit: opportunity.signals.unit,
     priceDropSeverity: opportunity.signals.price_drop_severity as PriceDropSeverity,
-    district: opportunity.signals.district, produceType: opportunity.signals.produce_type,
+    produceType: opportunity.signals.produce_type,
   });
 
   return (
@@ -376,7 +377,7 @@ export default function OpportunityDetail() {
                     <MapPin className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm text-muted-foreground">Location</p>
-                      <p className="font-medium">{opportunity.signals.district}</p>
+                      <p className="font-medium">{getLocationString(opportunity.signals)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-4">
@@ -438,7 +439,7 @@ export default function OpportunityDetail() {
             <ActionPlan
               opportunityId={opportunity.id}
               produceType={opportunity.signals.produce_type}
-              district={opportunity.signals.district}
+              location={getLocationString(opportunity.signals)}
               quantity={opportunity.signals.quantity}
               unit={opportunity.signals.unit}
               deadlineDays={opportunity.signals.harvest_deadline_days}
@@ -449,7 +450,7 @@ export default function OpportunityDetail() {
               produceType={opportunity.signals.produce_type}
               quantity={opportunity.signals.quantity}
               unit={opportunity.signals.unit}
-              district={opportunity.signals.district}
+              location={getLocationString(opportunity.signals)}
               deadlineDays={opportunity.signals.harvest_deadline_days}
             />
 

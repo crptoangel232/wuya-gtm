@@ -55,7 +55,7 @@ export default function Landing() {
               <div>
                 <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
                   <Leaf className="h-4 w-4" />
-                  Made for Sierra Leone
+                  Global Produce Platform
                 </div>
                 <h1 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
                   Turn Spoiling Produce into Sales in{' '}
@@ -86,7 +86,7 @@ export default function Landing() {
                 <div className="aspect-square overflow-hidden rounded-2xl shadow-2xl">
                   <img 
                     src={heroFarmerImage} 
-                    alt="Sierra Leone farmer with fresh produce" 
+                    alt="Farmer with fresh produce" 
                     className="h-full w-full object-cover"
                   />
                 </div>
@@ -104,7 +104,7 @@ export default function Landing() {
                 Good produce is going to waste
               </h2>
               <p className="mb-12 text-center text-muted-foreground">
-                Every year, thousands of tons of produce spoil in Sierra Leone — not because there aren't buyers, 
+                Every year, thousands of tons of produce spoil worldwide — not because there aren't buyers, 
                 but because sellers and buyers can't find each other fast enough.
               </p>
               <div className="grid gap-6 md:grid-cols-2">
@@ -213,19 +213,19 @@ export default function Landing() {
               <div className="aspect-video overflow-hidden rounded-xl shadow-xl">
                 <img 
                   src={communityFarmingImage} 
-                  alt="Sierra Leone farming community" 
+                  alt="Farming community" 
                   className="h-full w-full object-cover"
                 />
               </div>
               <div>
-                <h2 className="mb-4 text-3xl font-bold text-foreground">Built for our community</h2>
+                <h2 className="mb-4 text-3xl font-bold text-foreground">Built for communities worldwide</h2>
                 <p className="mb-4 text-muted-foreground">
-                  WUYA was created for Sierra Leone's farmers, traders, and field teams. 
+                  WUYA was created for farmers, traders, and field teams everywhere. 
                   We understand the challenges of getting perishable produce to market on time.
                 </p>
                 <ul className="space-y-3">
                   {[
-                    'Works across all 14 districts',
+                    'Works in any country or region',
                     'Simple enough for field agents on any phone',
                     'Find buyers in hours, not weeks',
                     'Photo uploads build trust with buyers',
@@ -250,7 +250,7 @@ export default function Landing() {
                 Move produce before it goes bad
               </h2>
               <p className="mb-8 text-primary-foreground/80">
-                Join WUYA and connect with verified buyers and sellers across Sierra Leone.
+                Join WUYA and connect with verified buyers and sellers worldwide.
               </p>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <Button size="lg" variant="secondary" asChild>
@@ -271,7 +271,7 @@ export default function Landing() {
 
       <footer className="border-t border-border bg-card py-8">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>© 2025 WUYA — Reducing produce waste across Sierra Leone</p>
+          <p>© 2025 WUYA — Reducing produce waste worldwide</p>
           <p className="mt-1">Connecting sellers and buyers before spoilage happens</p>
         </div>
       </footer>

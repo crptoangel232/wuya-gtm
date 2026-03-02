@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { exportLeadsToCsv, downloadCsv } from '@/lib/csv-export';
-import { DISTRICTS } from '@/lib/constants';
+import { getLocationString } from '@/lib/scoring';
 import { Download, Users, Loader2, ExternalLink, Search, RefreshCw, CheckCircle, XCircle, Eye, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -31,7 +31,7 @@ interface Lead {
   opportunities?: {
     id: string;
     score: number;
-    signals?: { produce_type: string; district: string } | null;
+    signals?: { produce_type: string; district: string; country?: string; region?: string; city?: string } | null;
   } | null;
 }
 
@@ -48,7 +48,7 @@ export default function LeadsPage() {
     try {
       const { data, error } = await supabase
         .from('buyer_leads')
-        .select('*, opportunities (id, score, signals (produce_type, district))')
+        .select('*, opportunities (id, score, signals (produce_type, district, country, region, city))')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setLeads(data || []);
@@ -70,7 +70,7 @@ export default function LeadsPage() {
       const q = searchQuery.toLowerCase();
       if (![lead.name, lead.company, lead.email, lead.role].some(f => f?.toLowerCase().includes(q))) return false;
     }
-    if (districtFilter !== 'all' && lead.opportunities?.signals?.district !== districtFilter) return false;
+    if (districtFilter !== 'all' && getLocationString(lead.opportunities?.signals || {}) !== districtFilter) return false;
     if (exportStatusFilter === 'exported' && (!lead.export_status || lead.export_status === 'not_exported')) return false;
     if (exportStatusFilter === 'not_exported' && lead.export_status && lead.export_status !== 'not_exported') return false;
     if (exportStatusFilter === 'failed' && lead.export_status !== 'failed') return false;
@@ -135,10 +135,12 @@ export default function LeadsPage() {
                 <Input placeholder="Search contacts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
               </div>
               <Select value={districtFilter} onValueChange={setDistrictFilter}>
-                <SelectTrigger><SelectValue placeholder="All Districts" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="All Locations" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Districts</SelectItem>
-                  {DISTRICTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {[...new Set(leads.map(l => getLocationString(l.opportunities?.signals || {})))].map(loc => (
+                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select value={exportStatusFilter} onValueChange={setExportStatusFilter}>
@@ -193,7 +195,7 @@ export default function LeadsPage() {
                           {lead.opportunities?.signals ? (
                             <Link to={`/opportunity/${lead.opportunity_id}`} className="flex items-center gap-1 text-sm text-primary hover:underline">
                               <span className="capitalize">{lead.opportunities.signals.produce_type}</span>
-                              <span className="text-muted-foreground">({lead.opportunities.signals.district})</span>
+                              <span className="text-muted-foreground">({getLocationString(lead.opportunities?.signals || {})})</span>
                             </Link>
                           ) : '-'}
                         </TableCell>

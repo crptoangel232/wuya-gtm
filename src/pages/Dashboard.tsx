@@ -12,7 +12,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { PRODUCE_TYPES, DISTRICTS, URGENCY_LABELS, OPPORTUNITY_STATUS } from '@/lib/constants';
+import { PRODUCE_TYPES, URGENCY_LABELS, OPPORTUNITY_STATUS } from '@/lib/constants';
+import { getLocationString } from '@/lib/scoring';
 import type { OpportunityStatus, UrgencyLabel } from '@/lib/constants';
 import { Eye, RefreshCw, Loader2, Bell, HelpCircle, Package, Users, Zap } from 'lucide-react';
 import { format } from 'date-fns';
@@ -29,7 +30,7 @@ interface OpportunityWithSignal {
   recommended_action: string;
   status: string;
   created_at: string;
-  signals: { produce_type: string; quantity: number; unit: string; district: string } | null;
+  signals: { produce_type: string; quantity: number; unit: string; district: string; country?: string; region?: string; city?: string } | null;
 }
 
 export default function Dashboard() {
@@ -49,7 +50,7 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('opportunities')
-        .select('id, score, urgency_label, recommended_action, status, created_at, signals (produce_type, quantity, unit, district)')
+        .select('id, score, urgency_label, recommended_action, status, created_at, signals (produce_type, quantity, unit, district, country, region, city)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -101,7 +102,7 @@ export default function Dashboard() {
 
   const filtered = opportunities.filter((o) => {
     if (produceFilter !== 'all' && o.signals?.produce_type !== produceFilter) return false;
-    if (districtFilter !== 'all' && o.signals?.district !== districtFilter) return false;
+    if (districtFilter !== 'all' && getLocationString(o.signals || {}) !== districtFilter) return false;
     if (urgencyFilter !== 'all' && o.urgency_label !== urgencyFilter) return false;
     if (statusFilter !== 'all' && o.status !== statusFilter) return false;
     return true;
@@ -147,10 +148,12 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
               <Select value={districtFilter} onValueChange={setDistrictFilter}>
-                <SelectTrigger><SelectValue placeholder="All Districts" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="All Locations" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Districts</SelectItem>
-                  {DISTRICTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {[...new Set(opportunities.map(o => getLocationString(o.signals || {})))].map(loc => (
+                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
@@ -184,7 +187,7 @@ export default function Dashboard() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Produce</TableHead>
-                      <TableHead>District</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead className="text-center">
                         <div className="flex items-center justify-center gap-1">
@@ -209,7 +212,7 @@ export default function Dashboard() {
                           <span className="mr-2">{PRODUCE_ICONS[o.signals?.produce_type || ''] || '🥬'}</span>
                           <span className="capitalize">{o.signals?.produce_type}</span>
                         </TableCell>
-                        <TableCell>{o.signals?.district}</TableCell>
+                        <TableCell>{getLocationString(o.signals || {})}</TableCell>
                         <TableCell>{o.signals?.quantity} {o.signals?.unit}</TableCell>
                         <TableCell className="text-center"><ScoreDisplay score={o.score} size="sm" /></TableCell>
                         <TableCell><UrgencyBadge urgency={o.urgency_label as UrgencyLabel} /></TableCell>

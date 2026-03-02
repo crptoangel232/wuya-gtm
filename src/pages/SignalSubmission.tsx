@@ -9,18 +9,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { PRODUCE_TYPES, DISTRICTS, UNITS, PRICE_DROP_SEVERITY } from '@/lib/constants';
-import { calculateScore, getUrgencyLabel, getRecommendedAction } from '@/lib/scoring';
+import { PRODUCE_TYPES, UNITS, PRICE_DROP_SEVERITY } from '@/lib/constants';
+import { calculateScore, getUrgencyLabel, getRecommendedAction, getLocationString } from '@/lib/scoring';
 import { Loader2, Bell, AlertTriangle } from 'lucide-react';
 
 const PRODUCE_ICONS: Record<string, string> = {
-  tomato: '🍅',
-  onion: '🧅',
-  rice: '🌾',
-  cassava: '🥔',
-  pepper: '🌶️',
-  potato: '🥔',
-  okra: '🥒',
+  tomato: '🍅', onion: '🧅', rice: '🌾', cassava: '🥔',
+  pepper: '🌶️', potato: '🥔', okra: '🥒',
 };
 
 export default function SignalSubmission() {
@@ -32,7 +27,9 @@ export default function SignalSubmission() {
     produceType: '',
     quantity: '',
     unit: 'kg',
-    district: '',
+    country: '',
+    region: '',
+    city: '',
     harvestDeadlineDays: '',
     priceDropSeverity: '',
     notes: '',
@@ -41,7 +38,7 @@ export default function SignalSubmission() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.produceType || !formData.quantity || !formData.district || 
+    if (!formData.produceType || !formData.quantity || !formData.country || 
         !formData.harvestDeadlineDays || !formData.priceDropSeverity) {
       toast({
         title: 'Missing fields',
@@ -54,14 +51,22 @@ export default function SignalSubmission() {
     setIsSubmitting(true);
 
     try {
-      // Insert signal
+      const locationStr = getLocationString({
+        country: formData.country,
+        region: formData.region,
+        city: formData.city,
+      });
+
       const { data: signal, error: signalError } = await supabase
         .from('signals')
         .insert({
           produce_type: formData.produceType,
           quantity: parseFloat(formData.quantity),
           unit: formData.unit,
-          district: formData.district,
+          district: locationStr, // keep for backward compat
+          country: formData.country,
+          region: formData.region || null,
+          city: formData.city || null,
           harvest_deadline_days: parseInt(formData.harvestDeadlineDays),
           price_drop_severity: formData.priceDropSeverity,
           notes: formData.notes || null,
@@ -71,13 +76,11 @@ export default function SignalSubmission() {
 
       if (signalError) throw signalError;
 
-      // Calculate score and create opportunity
       const score = calculateScore({
         harvestDeadlineDays: parseInt(formData.harvestDeadlineDays),
         quantity: parseFloat(formData.quantity),
         unit: formData.unit,
         priceDropSeverity: formData.priceDropSeverity as 'low' | 'medium' | 'high',
-        district: formData.district,
         produceType: formData.produceType,
       });
 
@@ -85,7 +88,7 @@ export default function SignalSubmission() {
       const recommendedAction = getRecommendedAction(
         score,
         formData.produceType,
-        formData.district,
+        locationStr,
         formData.priceDropSeverity as 'low' | 'medium' | 'high'
       );
 
@@ -126,7 +129,6 @@ export default function SignalSubmission() {
       <Header />
       <main className="container mx-auto px-4 py-8">
         <div className="mx-auto max-w-2xl">
-          {/* Page Header */}
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
               <Bell className="h-8 w-8 text-primary" />
@@ -171,22 +173,35 @@ export default function SignalSubmission() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="district">Where is it located? *</Label>
-                    <Select
-                      value={formData.district}
-                      onValueChange={(value) => setFormData({ ...formData, district: value })}
-                    >
-                      <SelectTrigger id="district">
-                        <SelectValue placeholder="Select district" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DISTRICTS.map((district) => (
-                          <SelectItem key={district} value={district}>
-                            {district}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="country">Country *</Label>
+                    <Input
+                      id="country"
+                      placeholder="e.g., Sierra Leone, Nigeria, Kenya"
+                      value={formData.country}
+                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="region">Region / State (optional)</Label>
+                    <Input
+                      id="region"
+                      placeholder="e.g., Western Area, Lagos State"
+                      value={formData.region}
+                      onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City / Town (optional)</Label>
+                    <Input
+                      id="city"
+                      placeholder="e.g., Freetown, Lagos, Nairobi"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    />
                   </div>
                 </div>
 
