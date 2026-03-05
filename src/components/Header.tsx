@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom';
-import { Leaf, BarChart3, Bell, Users } from 'lucide-react';
+import { Leaf, BarChart3, Bell, Users, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Header() {
+  const { user, signOut } = useAuth();
+
   return (
     <header className="border-b border-border bg-card">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -32,6 +35,11 @@ export function Header() {
               Report Alert
             </Link>
           </Button>
+          {user && (
+            <Button variant="ghost" size="icon" onClick={signOut} title="Sign out">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          )}
         </nav>
       </div>
     </header>
