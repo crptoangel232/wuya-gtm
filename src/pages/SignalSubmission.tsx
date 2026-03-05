@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { PRODUCE_TYPES, UNITS, PRICE_DROP_SEVERITY } from '@/lib/constants';
 import { calculateScore, getUrgencyLabel, getRecommendedAction, getLocationString } from '@/lib/scoring';
+import { CountryCombobox } from '@/components/CountryCombobox';
 import { Loader2, Bell, AlertTriangle } from 'lucide-react';
 
 const PRODUCE_ICONS: Record<string, string> = {
@@ -174,11 +175,9 @@ export default function SignalSubmission() {
 
                   <div className="space-y-2">
                     <Label htmlFor="country">Country *</Label>
-                    <Input
-                      id="country"
-                      placeholder="e.g., Sierra Leone, Nigeria, Kenya"
+                    <CountryCombobox
                       value={formData.country}
-                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                      onValueChange={(value) => setFormData({ ...formData, country: value })}
                     />
                   </div>
                 </div>
