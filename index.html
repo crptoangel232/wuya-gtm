@@ -1,28 +1,58 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WUYA — Turn Spoiling Produce into Sales</title>
-    <meta name="description" content="WUYA helps field teams report  produce that are at risk of spoilage, prioritize urgent cases, and connect sellers to verified buyers.">
-    <meta name="author" content="WUYA" />
-
-    
-    
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@WUYA" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-    <meta property="og:title" content="WUYA — Turn Spoiling Produce into Sales">
-  <meta name="twitter:title" content="WUYA — Turn Spoiling Produce into Sales">
-  <meta property="og:description" content="WUYA helps field teams report  produce that are at risk of spoilage, prioritize urgent cases, and connect sellers to verified buyers.">
-  <meta name="twitter:description" content="WUYA helps field teams report  produce that are at risk of spoilage, prioritize urgent cases, and connect sellers to verified buyers.">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WUYA GTM — Go-To-Market Strategy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:#1a1a2e;color:#e0e0e0;line-height:1.6;}
+.nav{display:flex;justify-content:space-between;align-items:center;padding:20px 40px;border-bottom:1px solid rgba(255,255,255,0.1);}
+.nav-logo{font-size:20px;font-weight:800;color:#f39c12;}
+.nav-links a{color:#bdc3c7;text-decoration:none;font-size:14px;margin-left:20px;}
+.hero{padding:80px 40px;text-align:center;max-width:800px;margin:0 auto;}
+.hero h1{font-size:38px;font-weight:900;background:linear-gradient(135deg,#f39c12,#e67e22);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:16px;}
+.hero p{font-size:17px;color:#95a5a6;margin-bottom:30px;max-width:600px;margin-left:auto;margin-right:auto;}
+.badge{display:inline-block;background:rgba(243,156,18,0.15);color:#f39c12;padding:6px 16px;border-radius:100px;font-size:13px;font-weight:600;margin-bottom:20px;}
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;max-width:900px;margin:0 auto;padding:0 40px 60px;}
+.feature-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:30px;transition:transform 0.2s,border-color 0.3s;}
+.feature-card:hover{transform:translateY(-3px);border-color:#f39c12;}
+.feature-icon{font-size:32px;margin-bottom:12px;}
+.feature-card h3{color:#e0e0e0;font-size:18px;margin-bottom:8px;}
+.feature-card p{color:#95a5a6;font-size:14px;}
+.cta{padding:14px 32px;background:linear-gradient(135deg,#f39c12,#e67e22);color:#1a1a2e;border:none;border-radius:10px;font-size:15px;font-weight:bold;cursor:pointer;text-decoration:none;display:inline-block;}
+.cta:hover{transform:translateY(-2px);box-shadow:0 5px 20px rgba(243,156,18,0.3);}
+.tech{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:600px;margin:0 auto 40px;padding:0 40px;}
+.tech span{padding:6px 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;font-size:13px;color:#f39c12;}
+.footer{text-align:center;padding:30px;color:#555;font-size:13px;border-top:1px solid rgba(255,255,255,0.05);}
+</style>
 </head>
-
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<body>
+<nav class="nav">
+<div class="nav-logo">WUYA GTM</div>
+<div class="nav-links">
+<a href="#features">Features</a>
+<a href="https://github.com/crptoangel232/wuya-gtm" target="_blank">GitHub</a>
+<a href="https://crptoangel232.github.io/My-Portfolio-Website/" target="_blank">Portfolio</a>
+</div>
+</nav>
+<section class="hero">
+<div class="badge">Go-To-Market Strategy</div>
+<h1>WUYA GTM — Turn Spoiling Produce into Sales</h1>
+<p>Go-to-market platform for the Wuya agricultural intelligence project. Helps field teams report produce at risk of spoilage, prioritize urgent cases, and connect sellers to verified buyers.</p>
+<a href="https://github.com/crptoangel232/wuya-gtm" target="_blank" class="cta">View Source Code</a>
+</section>
+<div class="tech">
+<span>TypeScript</span><span>React</span><span>Tailwind CSS</span><span>Marketing</span>
+</div>
+<div class="features" id="features">
+<div class="feature-card"><div class="feature-icon">🥬</div><h3>Spoilage Reporting</h3><p>Field teams report produce at risk of spoilage with photos and location data.</p></div>
+<div class="feature-card"><div class="feature-icon">⚡</div><h3>Urgency Prioritization</h3><p>AI ranks spoilage reports by urgency to prevent losses before they happen.</p></div>
+<div class="feature-card"><div class="feature-icon">🤝</div><h3>Buyer Matching</h3><p>Connect sellers with verified buyers to move produce before it spoils.</p></div>
+<div class="feature-card"><div class="feature-icon">📊</div><h3>Market Analytics</h3><p>Track spoilage rates, buyer engagement, and market demand trends.</p></div>
+</div>
+<div class="footer">WUYA GTM — by Albert Taylor | Sierra Leone</div>
+</body>
 </html>
