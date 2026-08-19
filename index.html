@@ -5,60 +5,101 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WUYA GTM — Spoilage to Sales</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:#f0e8d2;color:#2a2618;line-height:1.65;}
-.w{max-width:640px;margin:0 auto;padding:56px 24px;}
-.hd{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid #ddd2b0;}
-.hd .tg{font-family:Georgia,"Times New Roman",serif;font-size:13px;color:#8a6a28;margin-bottom:14px;}
-.hd h1{font-family:Georgia,"Times New Roman",serif;font-size:36px;font-weight:400;letter-spacing:-0.5px;margin-bottom:12px;}
-.hd .ds{font-size:15px;color:#6b6340;max-width:500px;margin-bottom:16px;}
-.nv{display:flex;gap:20px;font-size:13px;}
-.nv a{color:#8a6a28;text-decoration:none;border-bottom:1px solid transparent;padding-bottom:1px;}
-.nv a:hover{border-bottom-color:#8a6a28;}
-.fl{}.f{padding:18px 0;border-bottom:1px solid #ddd2b0;}
-.f{display:flex;gap:14px;}
-.fn{font-family:Georgia,"Times New Roman",serif;font-size:13px;color:#8a6a28;min-width:22px;flex-shrink:0;padding-top:2px;}
-.f h3{font-size:14px;font-weight:600;margin-bottom:3px;}
-.f p{font-size:13px;color:#6b6340;}
-.stats{display:flex;gap:28px;margin-bottom:36px;padding-bottom:24px;border-bottom:1px solid #ddd2b0;}
-.s{display:flex;flex-direction:column;}
-.sv{font-family:Georgia,"Times New Roman",serif;font-size:24px;font-weight:400;color:#8a6a28;}
-.sl{font-size:11px;color:#9a9078;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
-.se{margin-top:40px;margin-bottom:40px;}
-.se h2{font-family:Georgia,"Times New Roman",serif;font-size:17px;font-weight:400;margin-bottom:14px;}
-.sk{display:flex;flex-wrap:wrap;gap:6px;}
-.sk span{font-size:12px;color:#6b6340;padding:3px 10px;border:1px solid #ddd2b0;}
-.ft{padding-top:20px;border-top:1px solid #ddd2b0;font-size:12px;color:#9a9078;display:flex;justify-content:space-between;}
-.ft a{color:#6b6340;text-decoration:none;}
-.ft a:hover{text-decoration:underline;}
-@media(max-width:600px){.w{padding:40px 20px;}.hd h1{font-size:24px;}.ft{flex-direction:column;gap:6px;}}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#f1e9d3;color:#2a2618;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+
+.accent-line{height:3px;background:#8a6a28;width:100%}
+.wrap{max-width:760px;margin:0 auto;padding:0 24px}
+
+.hero{padding:56px 0 36px;background:linear-gradient(180deg, #f1e9d3 0%, #f9f3e6 100%);border-radius:0 0 12px 12px;margin-bottom:40px}
+.hero .tag{font-size:13px;color:#8a6a28;margin-bottom:18px;letter-spacing:0.5px;font-weight:600}
+.hero h1{font-family:Georgia,'Times New Roman',serif;font-size:44px;font-weight:600;letter-spacing:-1.2px;line-height:1.1;margin-bottom:16px}
+.hero .desc{font-size:17px;color:#6b6340;max-width:520px;margin-bottom:28px;line-height:1.6}
+.hero .cta{display:flex;gap:12px;flex-wrap:wrap}
+.hero .cta a{display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;border-radius:4px;transition:all 0.25s}
+.hero .cta .p{background:#8a6a28;color:#fff;border:1px solid #8a6a28}
+.hero .cta .p:hover{opacity:0.88;transform:translateY(-1px)}
+.hero .cta .s{background:transparent;color:#2a2618;border:1px solid #ddd2b0}
+.hero .cta .s:hover{background:#f9f3e6;border-color:#8a6a28}
+
+.stats{display:flex;gap:0;padding:24px 0;border-top:1px solid #ddd2b0;border-bottom:1px solid #ddd2b0;margin-bottom:48px}
+.stat{flex:1;text-align:center;padding:0 12px;border-right:1px solid #ddd2b0}
+.stat:last-child{border-right:none}
+.stat-v{font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:600;color:#8a6a28;display:block;line-height:1}
+.stat-l{font-size:11px;color:#9a9078;letter-spacing:1.5px;text-transform:uppercase;margin-top:8px;display:block}
+
+.sec{padding-bottom:48px}
+.sec-title{font-family:Georgia,'Times New Roman',serif;font-size:13px;color:#8a6a28;letter-spacing:1px;text-transform:uppercase;margin-bottom:24px;font-weight:700}
+
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:#f9f3e6;border:1px solid #ddd2b0;border-radius:6px;padding:22px;transition:all 0.25s;box-shadow:0 2px 12px #8a6a2810}
+.card:hover{border-color:#8a6a28;box-shadow:0 4px 20px #8a6a2815;transform:translateY(-2px)}
+.card-n{font-family:Georgia,'Times New Roman',serif;font-size:12px;color:#fff;display:inline-block;margin-bottom:10px;font-weight:600;padding:2px 8px;background:#8a6a28;border-radius:3px}
+.card h3{font-size:15px;font-weight:600;margin-bottom:8px}
+.card p{font-size:13px;color:#6b6340;line-height:1.55}
+
+.stack{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:40px}
+.stack span{font-size:13px;color:#6b6340;padding:7px 16px;border:1px solid #ddd2b0;border-radius:3px;background:#f9f3e6;transition:border-color 0.2s}
+.stack span:hover{border-color:#8a6a28}
+
+.footer{border-top:1px solid #ddd2b0;padding:28px 0;font-size:13px;color:#9a9078;display:flex;justify-content:space-between;align-items:center}
+.footer a{color:#6b6340;transition:color 0.2s}
+.footer a:hover{color:#8a6a28}
+
+@media(max-width:600px){
+.hero{padding:48px 0 28px}
+.hero h1{font-size:30px}
+.cards{grid-template-columns:1fr}
+.stats{flex-wrap:wrap;gap:12px}
+.stat{flex:1 1 40%;border-right:none;border-bottom:1px solid #ddd2b0;padding-bottom:10px;margin-bottom:10px}
+.stat:last-child{border-bottom:none}
+.footer{flex-direction:column;gap:8px;text-align:center}
+}
 </style>
 </head>
 <body>
-<div class="w">
-<div class="hd">
-<div class="tg">Move it before it rots.</div>
+<div class="accent-line"></div>
+<div class="wrap">
+<div class="hero">
+<div class="tag">Move it before it rots.</div>
 <h1>WUYA GTM</h1>
-<p class="ds">Field teams report at-risk produce. The system ranks by urgency. Sellers get matched to buyers. Less food wasted, more money in farmers' pockets.</p>
-<div class="nv">
-<a href="https://github.com/crptoangel232/wuya-gtm" target="_blank">Source</a>
-<a href="https://crptoangel232.github.io/My-Portfolio-Website/">Portfolio</a>
+<p class="desc">Field teams report at-risk produce. The system ranks by urgency. Sellers get matched to buyers. Less food wasted.</p>
+<div class="cta">
+<a class="p" href="https://github.com/crptoangel232/wuya-gtm" target="_blank">View Source</a>
+<a class="s" href="https://crptoangel232.github.io/My-Portfolio-Website/">Portfolio</a>
 </div>
 </div>
-
-<div class="fl">
-<div class="f"><span class="fn">01</span><div><h3>Spoilage Reporting</h3><p>Field teams log at-risk produce with photos and location.</p></div></div>
-<div class="f"><span class="fn">02</span><div><h3>Urgency Ranking</h3><p>Sorted by how fast produce will spoil. Act on what matters first.</p></div></div>
-<div class="f"><span class="fn">03</span><div><h3>Buyer Matching</h3><p>Connect sellers with verified buyers before produce is lost.</p></div></div>
-<div class="f"><span class="fn">04</span><div><h3>Market Analytics</h3><p>Spoilage rates, buyer engagement, demand trends over time.</p></div></div>
-
+<div class="stats"><div class="stat"><span class="stat-v">4</span><span class="stat-l">Modules</span></div><div class="stat"><span class="stat-v">Urgency</span><span class="stat-l">Ranking</span></div><div class="stat"><span class="stat-v">Verified</span><span class="stat-l">Buyers</span></div></div>
+<div class="sec">
+<div class="sec-title">What It Does</div>
+<div class="cards"><div class="card">
+<span class="card-n">01</span>
+<h3>Spoilage Reporting</h3>
+<p>Field teams log at-risk produce with photos and location.</p>
+</div><div class="card">
+<span class="card-n">02</span>
+<h3>Urgency Ranking</h3>
+<p>Sorted by how fast produce will spoil. Act on what matters first.</p>
+</div><div class="card">
+<span class="card-n">03</span>
+<h3>Buyer Matching</h3>
+<p>Connect sellers with verified buyers before produce is lost.</p>
+</div><div class="card">
+<span class="card-n">04</span>
+<h3>Market Analytics</h3>
+<p>Spoilage rates, buyer engagement, demand trends over time.</p>
+</div></div>
 </div>
-<div class="se">
-<h2>Built with</h2>
-<div class="sk"><span>TypeScript</span><span>React</span><span>Tailwind CSS</span></div>
+<div class="sec">
+<div class="sec-title">Built With</div>
+<div class="stack"><span>TypeScript</span><span>React</span><span>Tailwind CSS</span></div>
 </div>
-<div class="ft">
-<span>Albert Taylor — Sierra Leone</span>
+</div>
+<div class="wrap">
+<div class="footer">
+<span>Albert Taylor — Freetown, Sierra Leone</span>
 <a href="https://github.com/crptoangel232" target="_blank">github.com/crptoangel232</a>
 </div>
 </div>
